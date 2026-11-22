@@ -3,14 +3,14 @@
   "manifestVersion": 2,
   "id": "agent-flow",
   "name": "Agent Flow",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Live n8n-style canvas of your agents, subagents, orchestration tasks, handoffs and worktrees, with controls.",
   "author": {
     "name": "Nhoeun Sokpiseth",
     "url": "https://github.com/SokpisethNhoeun"
   },
-  "repository": "https://github.com/SokpisethNhoeun/orca-plugin-agent-flow",
-  "homepage": "https://github.com/SokpisethNhoeun/orca-plugin-agent-flow",
+  "repository": "https://github.com/SokpisethNhoeun/agent-flow",
+  "homepage": "https://github.com/SokpisethNhoeun/agent-flow",
   "license": "MIT",
   "icon": "assets/icon.png",
   "cover": {

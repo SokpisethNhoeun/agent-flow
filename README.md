@@ -203,7 +203,7 @@ From GitHub (pinned to the newest `vX.Y.Z` tag; Orca lists the access it asks fo
 command to approve it):
 
 ```sh
-orca plugin install SokpisethNhoeun/orca-plugin-agent-flow
+orca plugin install sokpisethnhoeun/agent-flow
 ```
 
 From a local checkout (development, live reload):
