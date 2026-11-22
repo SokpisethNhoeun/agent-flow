@@ -1,3 +1,5 @@
+![Agent Flow: live canvas of your Orca agents](assets/banner.png)
+
 # Agent Flow for Orca
 
 ![Agent Flow: an agent's chat next to the live canvas (test data)](assets/screenshots/chat.webp)
