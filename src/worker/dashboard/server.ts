@@ -2,7 +2,9 @@
 // Every /api call needs the token (header), the Host must be loopback, and POSTs must come from
 // our own origin with a JSON body, so other sites in the person's browser cannot drive it.
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
-import { readFile } from 'node:fs/promises'
+import { readFile, stat } from 'node:fs/promises'
+import { promisify } from 'node:util'
+import { brotliCompress, constants } from 'node:zlib'
 import { extname, resolve, sep } from 'node:path'
 import { READ_ONLY_COMMANDS, type CommandKind, type CommandResponse } from '../../shared/commands.ts'
 import type { FlowDelta, FlowSnapshot } from '../../shared/events.ts'
@@ -27,6 +29,7 @@ const STATIC_FILES = new Set(['dashboard.html', 'app.js', 'app.css', 'icon.svg',
 const CHUNK_FILE = /^chunks\/[A-Za-z0-9_-]{1,80}\.js$/
 const MAX_BODY = 128 * 1024
 const MAX_CLIENTS = 8
+const brotli = promisify(brotliCompress)
 
 export class DashboardServer {
   private server: Server | null = null
@@ -139,6 +142,20 @@ export class DashboardServer {
     for (const client of this.clients) client.write(payload)
   }
 
+  private brotliCache = new Map<string, { mtime: number; data: Promise<Buffer> }>()
+
+  /** Brotli copy of a text file, made on first request and reused until the file changes. */
+  private async compressed(file: string): Promise<Buffer | null> {
+    if (!/\.(js|css|html|svg)$/.test(file)) return null
+    const mtime = (await stat(file)).mtimeMs
+    const hit = this.brotliCache.get(file)
+    if (hit && hit.mtime === mtime) return hit.data
+    const data = readFile(file).then((raw) => brotli(raw, { params: { [constants.BROTLI_PARAM_QUALITY]: 9, [constants.BROTLI_PARAM_SIZE_HINT]: raw.length } }))
+    this.brotliCache.set(file, { mtime, data })
+    data.catch(() => this.brotliCache.delete(file))
+    return data
+  }
+
   private async serveStatic(res: ServerResponse, pathname: string, brotli: boolean): Promise<void> {
     const name = pathname === '/' ? 'dashboard.html' : pathname.replace(/^\/+/, '')
     if (!STATIC_FILES.has(name) && !CHUNK_FILE.test(name)) return send(res, 404, 'Not found')
@@ -148,9 +165,11 @@ export class DashboardServer {
     let data: Buffer
     let encoded = false
     try {
-      // The build writes a brotli copy next to each file; fall back to the plain file without it.
-      if (brotli) {
-        data = await readFile(`${file}.br`).then((d) => ((encoded = true), d)).catch(() => readFile(file))
+      // Compressed once per file version and kept in memory (no compressed copies ship with the plugin).
+      const compressed = brotli ? await this.compressed(file) : null
+      if (compressed) {
+        data = compressed
+        encoded = true
       } else data = await readFile(file)
     } catch {
       return send(res, 404, 'Not found')

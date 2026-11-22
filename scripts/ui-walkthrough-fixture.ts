@@ -73,9 +73,8 @@ try {
     failed += result.failed
   }
 } finally {
-  // Close only the tab this run opened.
-  const index = orca(['tab', 'list']).tabs.findIndex((t: { browserPageId: string }) => t.browserPageId === page)
-  if (index >= 0) orca(['tab', 'close', '--index', String(index)])
+  // Close only the tab this run opened, by its page id (`--index` is not the position in `tab list`).
+  if (orca(['tab', 'list']).tabs.some((t: { browserPageId: string }) => t.browserPageId === page)) orca(['tab', 'close', '--page', page])
   await server.stop()
 }
 process.exit(failed ? 1 : 0)

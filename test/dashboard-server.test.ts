@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { request } from 'node:http'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { brotliCompressSync, brotliDecompressSync } from 'node:zlib'
+import { brotliDecompressSync } from 'node:zlib'
 import { acceptsBrotli, DashboardServer } from '../src/worker/dashboard/server.ts'
 import { newToken } from '../src/worker/dashboard/auth.ts'
 import { command, makeRouter } from './helpers/router-setup.ts'
@@ -37,8 +37,6 @@ describe('DashboardServer', () => {
     await writeFile(join(tmp.dir, 'dashboard.html'), '<!doctype html><title>Agent Flow</title>')
     await writeFile(join(tmp.dir, 'secret.txt'), 'do not serve')
     await writeFile(join(tmp.dir, 'app.css'), 'body{color:red}')
-    await writeFile(join(tmp.dir, 'app.css.br'), brotliCompressSync(Buffer.from('body{color:red}')))
-    await writeFile(join(tmp.dir, 'secret.txt.br'), brotliCompressSync(Buffer.from('do not serve')))
     fake = makeRouter({ host: { 'terminal.focus': () => ({ focused: true }) } })
     server = new DashboardServer({
       uiDir: tmp.dir,
@@ -170,7 +168,7 @@ describe('DashboardServer', () => {
     assert.equal((await call(port, { path: '/chunks/sub/x.js' })).status, 404)
   })
 
-  it('serves the brotli copy only to browsers that accept it, and never an unlisted file', async () => {
+  it('compresses with brotli only for browsers that accept it, and never serves an unlisted file', async () => {
     const plain = await call(port, { path: '/app.css' })
     assert.equal(plain.body, 'body{color:red}')
     assert.equal(plain.headers['content-encoding'], undefined)
@@ -185,7 +183,6 @@ describe('DashboardServer', () => {
     })
     assert.equal(br.encoding, 'br')
     assert.equal(brotliDecompressSync(br.body).toString(), 'body{color:red}')
-    // index.html has no .br copy: falls back to the plain file
     assert.equal((await call(port, { path: '/', headers: { 'Accept-Encoding': 'br' } })).status, 200)
     assert.equal((await call(port, { path: '/secret.txt.br', headers: { 'Accept-Encoding': 'br' } })).status, 404)
     assert.equal((await call(port, { path: '/secret.txt', headers: { 'Accept-Encoding': 'br' } })).status, 404)
