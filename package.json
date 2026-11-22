@@ -1,6 +1,6 @@
 {
   "name": "agent-flow",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "private": true,
   "type": "module",
   "description": "n8n-style live visual multi-agent orchestration view for Orca",

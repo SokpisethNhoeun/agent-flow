@@ -3,7 +3,7 @@
   "manifestVersion": 2,
   "id": "agent-flow",
   "name": "Agent Flow",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Live n8n-style canvas of your agents, subagents, orchestration tasks, handoffs and worktrees, with controls.",
   "author": {
     "name": "Nhoeun Sokpiseth",

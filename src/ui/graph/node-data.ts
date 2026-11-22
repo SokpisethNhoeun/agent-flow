@@ -11,6 +11,9 @@ export function agentNode(agent: AgentRecord, state: FlowState, extra: Partial<F
   const chips: FlowNodeData['chips'] = []
   const details = agentDetails(agent)
   if (agent.failureCount > 0) chips.push({ label: `${agent.failureCount} failure${agent.failureCount > 1 ? 's' : ''}`, tone: 'danger' })
+  // Its own turn ended but sub-agents it started are still at work (background agents): not "done".
+  const workingSubagents = agent.live || agent.role === 'subagent' ? 0 : liveSubagentsOf(agent.id, state)
+  if (workingSubagents) chips.push({ label: `${workingSubagents} sub-agent${workingSubagents > 1 ? 's' : ''} working`, tone: 'accent', title: 'Its own reply is finished; sub-agents it started are still working' })
   const task = agent.taskId ? state.tasks[agent.taskId] : undefined
   const title =
     kind === 'lead'
@@ -32,7 +35,7 @@ export function agentNode(agent: AgentRecord, state: FlowState, extra: Partial<F
       kind,
       title,
       subtitle: subtitle ?? null,
-      status: kind === 'lead' ? leadStatus(agent, state) : agentStatus(agent),
+      status: workingSubagents ? 'running' : kind === 'lead' ? leadStatus(agent, state) : agentStatus(agent),
       entity: { type: 'agent', id: agent.id },
       live: agent.live,
       chips,
@@ -183,6 +186,12 @@ export function aggregateStatus(statuses: VisualStatus[]): VisualStatus {
 function distinct(title: string, ...values: (string | null | undefined)[]): string | null {
   for (const value of values) if (value && value.trim() && value.trim() !== title.trim()) return value
   return null
+}
+
+function liveSubagentsOf(agentId: string, state: FlowState): number {
+  let count = 0
+  for (const other of Object.values(state.agents)) if (other.role === 'subagent' && other.parentId === agentId && other.live) count++
+  return count
 }
 
 function leadStatus(agent: AgentRecord, state: FlowState): VisualStatus {

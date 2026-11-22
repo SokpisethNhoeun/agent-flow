@@ -52,6 +52,20 @@ describe('SubagentFilesAdapter', () => {
     }
   })
 
+  it('a background subagent keeps working after its parent turn ended (parent reported done)', async () => {
+    const { adapter, fake, cleanup } = await setup({ description: 'W1: enforce allowed HTTP methods', toolUseId: 'toolu_bg', finished: false })
+    try {
+      const parent = fake.ctx.store.read().agents['term:p']
+      fake.ctx.store.upsertAgent(parent.id, Date.now(), { ...parent, live: false, state: 'done' }, () => parent)
+      await adapter.scan()
+      const sub = fake.ctx.store.read().agents['sub:toolu_bg']
+      assert.equal(sub.live, true, 'still writing: it is working')
+      assert.equal(sub.state, 'working')
+    } finally {
+      await cleanup()
+    }
+  })
+
   it('marks finished subagents done, and quiet unfinished ones as not live', async () => {
     const finished = await setup({ description: 'Done one', toolUseId: 'toolu_2', finished: true })
     try {

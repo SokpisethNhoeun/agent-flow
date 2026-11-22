@@ -11,7 +11,11 @@ import { newAgent, type WorkerContext } from '../context.ts'
 
 type Meta = { agentType?: string; description?: string; toolUseId?: string; model?: string; finished?: boolean; spawnDepth?: number }
 
-/** A subagent still writing within this window counts as working (with a live parent). */
+/**
+ * A subagent still writing within this window counts as working, even when its parent's own turn has
+ * ended: Claude runs background agents on after the lead replies (Orca then reports the lead as done).
+ * If the session really stops, the subagent stops writing and goes quiet within this window.
+ */
 const ACTIVE_WRITE_MS = 90_000
 const RECENT_SESSION_MS = 6 * 60 * 60 * 1000
 const DIR_RETRY_MS = 60_000
@@ -158,7 +162,7 @@ export class SubagentFilesAdapter {
       const existing = this.ctx.store.read().agents[id]
       const writing = now - mtime < ACTIVE_WRITE_MS
       const finished = meta.finished === true
-      const live = !finished && writing && parent.live
+      const live = !finished && writing
       // Unchanged files only need a liveness refresh (a subagent goes quiet when its parent stops).
       if (this.seenMtime.get(id) === mtime && existing && existing.live === live) continue
       this.seenMtime.set(id, mtime)
