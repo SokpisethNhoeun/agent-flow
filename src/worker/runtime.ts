@@ -26,6 +26,9 @@ import { Persistence, stateDir } from './state/persistence.ts'
 import { FlowStore } from './state/store.ts'
 import { ViewerTracker } from './state/viewers.ts'
 import { OutputWatcher } from './commands/output-watcher.ts'
+import { AttachmentStore, attachmentsRoot } from './commands/attachments.ts'
+import { StarPromptStore } from './state/star-prompt.ts'
+import { UpdateChecker } from './update/update-check.ts'
 import { connectPanels } from './transport/panel-bridge.ts'
 
 type Settings = {
@@ -35,9 +38,11 @@ type Settings = {
   actAsCoordinator: boolean
   cliPath: string
   chatSend: boolean
+  checkUpdates: boolean
 }
 
-const DEFAULT_SETTINGS: Settings = { dashboardEnabled: false, dashboardPort: 4790, dashboardControls: false, actAsCoordinator: false, cliPath: '', chatSend: true }
+/** Everything on by default (the manifest's defaults match); each setting can be turned off in Orca. */
+const DEFAULT_SETTINGS: Settings = { dashboardEnabled: true, dashboardPort: 4790, dashboardControls: true, actAsCoordinator: true, cliPath: '', chatSend: true, checkUpdates: true }
 /** Start attempts after a failure: 2 s, 4 s, 8 s, 16 s, 32 s. */
 const DASHBOARD_RETRIES = 5
 /** How often state is saved for crash recovery (only when something changed). */
@@ -124,6 +129,10 @@ export class AgentFlowRuntime {
       claudeTranscriptPath: (agent) => this.subagentFiles.transcriptPathFor(agent),
       watchOutput: (agentId, path) => this.outputWatcher.track(agentId, path),
       noteOutputInterest: (agentId) => this.outputWatcher.noteInterest(agentId),
+      attachments: new AttachmentStore(attachmentsRoot(stateDir())),
+      starPrompt: new StarPromptStore(stateDir()),
+      // The plugin folder is one level above dist/worker.mjs.
+      updates: new UpdateChecker(fileURLToPath(new URL('..', import.meta.url)), () => this.settings.checkUpdates),
       setDashboardControls: async (enabled) => {
         await this.orca.settings.set('dashboardControls', enabled)
         this.settings = await this.readSettings()
@@ -423,12 +432,14 @@ export class AgentFlowRuntime {
     try {
       const raw = await this.orca.settings.get()
       return {
-        dashboardEnabled: raw.dashboardEnabled === true,
+        // Unset means the default (on); only an explicit false turns a setting off.
+        dashboardEnabled: raw.dashboardEnabled !== false,
         dashboardPort: typeof raw.dashboardPort === 'number' && raw.dashboardPort >= 1024 && raw.dashboardPort <= 65000 ? raw.dashboardPort : 4790,
-        dashboardControls: raw.dashboardControls === true,
-        actAsCoordinator: raw.actAsCoordinator === true,
+        dashboardControls: raw.dashboardControls !== false,
+        actAsCoordinator: raw.actAsCoordinator !== false,
         cliPath: typeof raw.cliPath === 'string' ? raw.cliPath.trim() : '',
-        chatSend: raw.chatSend !== false
+        chatSend: raw.chatSend !== false,
+        checkUpdates: raw.checkUpdates !== false
       }
     } catch {
       return DEFAULT_SETTINGS

@@ -1,8 +1,6 @@
 // Send a prompt to an agent where Orca allows it. Says up front how the text will be delivered,
 // or why it cannot be (chat sessions and subagents have no API).
-import { useState } from 'react'
 import type { AgentRecord } from '../../../shared/model.ts'
-import { Button } from '../../components/primitives.tsx'
 import { useApp, useFlowView } from '../../state/app-context.tsx'
 
 /** Chats already confirmed in this window. */
@@ -25,65 +23,20 @@ export function promptRoute(agent: AgentRecord, available: boolean, chatSend: bo
 }
 
 /** How a prompt reaches this agent, and a send function (null when it cannot be sent). */
-export function usePromptSender(agent: AgentRecord): { route: Route; send: ((text: string) => Promise<boolean>) | null } {
+export function usePromptSender(agent: AgentRecord): { route: Route; send: ((text: string, attachments?: string[]) => Promise<boolean>) | null } {
   const { runCommand, client } = useApp()
   const { state, mode } = useFlowView()
   const viewOnly = client.transport.kind === 'http' && state.capabilities.dashboardControls !== true
   const route: Route = viewOnly
     ? { canSend: false, why: 'This browser dashboard is view-only. Send from the Agent Flow panel inside Orca, or turn on “Allow controls from the browser dashboard” in Agent Flow settings.' }
     : promptRoute(agent, state.capabilities.commands['agent.prompt']?.available ?? false, state.capabilities.chatSend !== false)
-  const send = async (text: string): Promise<boolean> => {
+  const send = async (text: string, attachments: string[] = []): Promise<boolean> => {
     // First message to a chat session: ask once (per session) before using the experimental route.
     const chat = Boolean(agent.paneKey?.startsWith('structured-agent-session-')) && !agent.terminalId
     const confirm = chat && !confirmedChats.has(agent.id) ? { title: 'Send into this chat session?', message: `Agent Flow will post your message into “${agent.title ?? 'this chat'}” as if you typed it in its tab. If the agent is busy, Orca queues it.`, label: 'Send', danger: false } : undefined
-    const response = await runCommand('agent.prompt', { agentId: agent.id, text }, confirm)
+    const response = await runCommand('agent.prompt', { agentId: agent.id, text, ...(attachments.length ? { attachments } : {}) }, confirm)
     if (response?.ok && chat) confirmedChats.add(agent.id)
     return Boolean(response?.ok)
   }
   return { route, send: mode === 'replay' || !route.canSend ? null : send }
-}
-
-export function PromptComposer({ agent }: { agent: AgentRecord }) {
-  const { mode } = useFlowView()
-  const { route, send: sendPrompt } = usePromptSender(agent)
-  const [text, setText] = useState('')
-  const [sending, setSending] = useState(false)
-  const disabled = !sendPrompt
-
-  const send = async () => {
-    if (!sendPrompt || sending || !text.trim()) return
-    setSending(true)
-    try {
-      if (await sendPrompt(text)) setText('')
-    } finally {
-      setSending(false)
-    }
-  }
-
-  return (
-    <div className="af-composer">
-      <textarea
-        className="af-textarea"
-        rows={3}
-        maxLength={20000}
-        value={text}
-        disabled={disabled}
-        placeholder={mode === 'replay' ? 'Replay is read-only' : route.canSend ? `Message ${agent.title ?? 'this agent'}… (Enter to send, Shift+Enter for a new line)` : 'Sending is not available for this agent'}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-            e.preventDefault()
-            void send()
-          }
-        }}
-        aria-label="Prompt message"
-      />
-      <div className="af-composer-foot">
-        <span className="af-muted">{route.canSend ? route.how : route.why}</span>
-        <Button variant="primary" size="sm" icon="message" disabled={disabled || sending || !text.trim()} onClick={() => void send()}>
-          {sending ? 'Sending…' : 'Send'}
-        </Button>
-      </div>
-    </div>
-  )
 }

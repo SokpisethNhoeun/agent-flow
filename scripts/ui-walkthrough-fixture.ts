@@ -33,6 +33,8 @@ const server = {
   /** Every live agent goes idle, or comes back to work (one live update each). */
   grow: async (n: number) => void (await fetch(`${address.origin}/__test/grow?n=${n}`, { method: 'POST' })),
   setAgentState: async (id: string, state: string) => void (await fetch(`${address.origin}/__test/agent-state?id=${id}&state=${state}`, { method: 'POST' })),
+  updateOn: async () => void (await fetch(`${address.origin}/__test/update-on`, { method: 'POST' })),
+  starOn: async () => void (await fetch(`${address.origin}/__test/star-on`, { method: 'POST' })),
   setLive: async (live: boolean) => void (await fetch(`${address.origin}/__test/${live ? 'live' : 'idle'}`, { method: 'POST' })),
   stop: async () => {
     child.stdin!.end()

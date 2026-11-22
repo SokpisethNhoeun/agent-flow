@@ -6,7 +6,8 @@ import type { AgentRecord } from '../../../shared/model.ts'
 import { Button, EmptyState } from '../../components/primitives.tsx'
 import { Switch } from '../../components/ui/Controls.tsx'
 import { useApp } from '../../state/app-context.tsx'
-import { PromptComposer, usePromptSender } from './PromptComposer.tsx'
+import { usePromptSender } from './PromptComposer.tsx'
+import { ChatComposer } from '../../chat/ChatComposer.tsx'
 import { ChatBoundary } from '../../chat/ChatBoundary.tsx'
 import { AgentChat } from '../../chat/LazyAgentChat.tsx'
 import type { ConversationMessage } from '../../chat/conversation-to-thread.ts'
@@ -113,11 +114,13 @@ export function OutputPanel({ agent }: { agent: AgentRecord }) {
     if (follow && ref.current) ref.current.scrollTop = ref.current.scrollHeight
   }, [output, follow])
 
+  // After sending, look again soon so the new message shows up (unless changes are pushed).
+  const chatSend = send ? async (text: string, attachments: string[]) => { const ok = await send(text, attachments); if (ok && !push) setTimeout(() => void load(), 1500); return ok } : null
   if (error || !output)
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
         <div style={{ flex: 1 }}>{error ? <EmptyState icon="terminal" title="No output">{error}</EmptyState> : <div className="af-empty">Loading…</div>}</div>
-        <PromptComposer agent={agent} />
+        <ChatComposer agent={agent} send={chatSend} note={route.canSend ? route.how : route.why} />
       </div>
     )
   const needle = (find ?? '').trim().toLowerCase()
@@ -142,8 +145,6 @@ export function OutputPanel({ agent }: { agent: AgentRecord }) {
     setEarlier((e) => ({ messages: mergeMessages(older.messages, e.messages), hasMore: older.messages.length > 0 && older.truncated, loading: false }))
   }
   const status = agent.live ? (agent.state === 'working' ? 'Working' : agent.state === 'waiting' ? 'Waiting for input' : agent.state === 'blocked' ? 'Needs attention' : 'Idle') : 'Not running'
-  // After sending, look again soon so the new message shows up.
-  const chatSend = send ? async (text: string) => { const ok = await send(text); if (ok && !push) setTimeout(() => void load(), 1500); return ok } : null
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '6px 10px', borderBottom: '1px solid var(--af-border)', fontSize: 12, flexWrap: 'wrap' }}>
@@ -209,7 +210,7 @@ export function OutputPanel({ agent }: { agent: AgentRecord }) {
         </ScrollArea>
       )}
       </div>
-      {output.kind === 'conversation' ? null : <PromptComposer agent={agent} />}
+      {output.kind === 'conversation' ? null : <ChatComposer agent={agent} send={chatSend} note={route.canSend ? route.how : route.why} />}
     </div>
   )
 }

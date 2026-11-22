@@ -9,6 +9,8 @@ import { ExplorerRail } from './panels/ExplorerRail.tsx'
 import { Inspector } from './panels/Inspector.tsx'
 import { Toolbar } from './panels/Toolbar.tsx'
 import { LiveAnnouncer } from './components/LiveAnnouncer.tsx'
+import { StarPrompt } from './components/StarPrompt.tsx'
+import { UpdateNotice } from './components/UpdateNotice.tsx'
 import { useApp, useFlowView, useViewState } from './state/app-context.tsx'
 
 const NARROW_PX = 900
@@ -39,9 +41,11 @@ export function App() {
   return (
     <div className={`af-app ${compact ? 'af-compact' : ''}`}>
       <LiveAnnouncer />
+      <StarPrompt />
       <div>
         <Toolbar />
         <ReplayBar />
+        <UpdateNotice />
         {flow.loaded && !caps.cliAvailable ? (
           <div className="af-banner">The orca CLI was not found, so orchestration runs, tasks and their controls are off. Set its path under Agent Flow in Orca Settings.</div>
         ) : null}

@@ -62,6 +62,12 @@ describe('DashboardServer', () => {
   const post = (body: unknown, headers: Record<string, string> = {}) =>
     call(port, { method: 'POST', path: '/api/command', headers: { ...auth(), 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(body) })
 
+  it('answers an oversized request with a readable too_large error', async () => {
+    const reply = await post({ requestId: 'r-too-big-1', kind: 'viewer.ping', params: { pad: 'x'.repeat(140 * 1024) } })
+    assert.equal(reply.status, 413)
+    assert.equal(JSON.parse(reply.body).error.code, 'too_large')
+  })
+
   it('exposes a loopback URL carrying the token', () => {
     assert.equal(server.url, `http://127.0.0.1:${port}/#token=${token}`)
   })

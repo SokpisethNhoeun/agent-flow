@@ -53,6 +53,11 @@ export function commandAvailability(kind: CommandKind, probe: Probe): CommandAva
     case 'history.list':
     case 'history.load':
     case 'viewer.ping':
+    case 'agent.attach':
+    case 'star.visit':
+    case 'update.check':
+    case 'update.run':
+    case 'star.answer':
     case 'dashboard.info':
     case 'entity.detail':
     case 'agent.image':

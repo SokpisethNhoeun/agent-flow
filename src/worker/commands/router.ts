@@ -1,5 +1,8 @@
+import type { UpdateChecker } from '../update/update-check.ts'
+import type { StarAnswer, StarPromptStore } from '../state/star-prompt.ts'
 // Runs validated commands against real Orca operations. Each request id runs at most once;
 // destructive commands need the UI's confirmation flag; results are reported as they happened.
+import { mentionFor, type AttachmentStore, type AttachmentType } from './attachments.ts'
 import { createHash } from 'node:crypto'
 import { DESTRUCTIVE_COMMANDS, READ_ONLY_COMMANDS, validateCommand, ValidationError, type CommandKind, type CommandRequest, type CommandResponse } from '../../shared/commands.ts'
 import type { AgentRecord, LabelConfig } from '../../shared/model.ts'
@@ -30,6 +33,12 @@ export type RouterDeps = {
   watchOutput?: (agentId: string, path: string) => boolean
   /** Output without a file: views are told on the agent's status changes and tool calls instead. */
   noteOutputInterest?: (agentId: string) => void
+  /** Images attached in the message box (agent.attach). */
+  attachments?: AttachmentStore
+  /** The occasional "star the project" prompt. */
+  starPrompt?: StarPromptStore
+  /** New-version checks and `orca plugin update`. */
+  updates?: UpdateChecker
   /** The plugin's own `dashboardControls` setting (same switch as in Orca Settings). */
   setDashboardControls?: (enabled: boolean) => Promise<{ controls: boolean }>
   setDashboard: (enabled: boolean) => Promise<{ enabled: boolean; url: string | null }>
@@ -105,7 +114,21 @@ export class CommandRouter {
       case 'agent.readOutput':
         return p.before ? this.readEarlier(p.agentId, p.before) : this.readOutputSince(p.agentId, p.since)
       case 'agent.prompt':
-        return this.prompt(p.agentId, p.text)
+        return this.prompt(p.agentId, p.text ?? '', (request.params.attachments as string[] | undefined) ?? [])
+      case 'update.check':
+        return this.deps.updates ? ok(await this.deps.updates.check(request.params.force === true)) : fail('unsupported', 'Update checks are not available here.')
+      case 'update.run':
+        return this.deps.updates ? ok(await this.deps.updates.update(this.deps.ctx.cli)) : fail('unsupported', 'Updating is not available here.')
+      case 'star.visit':
+        return this.deps.starPrompt ? ok(await this.deps.starPrompt.visit()) : ok({ show: false })
+      case 'star.answer':
+        await this.deps.starPrompt?.answer(p.answer as StarAnswer)
+        return ok({ saved: true })
+      case 'agent.attach': {
+        if (!this.deps.attachments) return fail('unsupported', 'Attaching images is not available here.')
+        const result = await this.deps.attachments.append(p.uploadId, p.mediaType as AttachmentType, p.chunk, Number(p.offset), request.params.done === true)
+        return ok(result)
+      }
       case 'agent.image':
         return this.image(p.agentId, p.ref, Number(p.offset ?? 0))
       case 'agent.launch': {
@@ -249,12 +272,21 @@ export class CommandRouter {
    * Sends a prompt where Orca allows it: typed into the agent's terminal, or as an orchestration
    * message to a worker (coordinator rules apply). Chat sessions and subagents have no API.
    */
-  private async prompt(agentId: string, text: string): Promise<CommandResponse> {
+  private async prompt(agentId: string, rawText: string, attachmentIds: string[] = []): Promise<CommandResponse> {
     const { ctx } = this.deps
     const agent = ctx.store.read().agents[agentId]
     if (!agent) return fail('not_found', 'That agent is no longer known.')
-    if (!text.trim()) return fail('invalid_params', 'The message is empty.')
+    if (!rawText.trim() && !attachmentIds.length) return fail('invalid_params', 'The message is empty.')
     if (agent.role === 'subagent') return fail('unsupported', 'A subagent only takes its brief from its parent. Send your message to the parent agent instead.')
+    // Attached images: only files Agent Flow itself saved (by id), mentioned the way each route reads them.
+    const paths: string[] = []
+    for (const id of attachmentIds) {
+      const path = this.deps.attachments?.pathFor(id)
+      if (!path) return fail('not_found', 'An attached image is no longer available; attach it again.')
+      paths.push(path)
+    }
+    const route = chatSessionIdFromPaneKey(agent.paneKey) && !agent.terminalId ? 'chat' : agent.agent === 'claude' || agent.agent === null ? 'claude-terminal' : 'other'
+    const text = [rawText.trim(), ...paths.map((path) => mentionFor(path, route))].filter(Boolean).join(' ')
     if (agent.terminalId && ctx.orca.host.has('terminal.sendText')) {
       const result = await ctx.orca.host.call('terminal.sendText', { terminalId: agent.terminalId, text, enter: true })
       return result.accepted ? ok({ via: 'terminal', delivered: true }) : fail('action_failed', 'Orca did not accept the text for that terminal.')

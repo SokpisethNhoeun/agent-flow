@@ -140,6 +140,7 @@ export function useViewState() {
 
 const LABELS: Partial<Record<CommandKind, string>> = {
   'terminal.focus': 'Open terminal',
+  'agent.prompt': 'Send message',
   'agent.launch': 'Launch agent',
   'agent.resume': 'Resume session',
   'agent.stop': 'Stop agent',

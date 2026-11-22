@@ -220,7 +220,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .af-menu button:hover:not(:disabled) { background: var(--af-accent); color: var(--af-accent-fg); }
 .af-menu button:disabled { opacity: .45; cursor: not-allowed; }
 .af-menu hr { border: 0; border-top: 1px solid var(--af-border); margin: 4px 0; }
-.af-toasts { position: fixed; right: 12px; bottom: 12px; display: grid; gap: 8px; z-index: 120; max-width: min(420px, calc(100% - 24px)); }
+.af-toasts { position: fixed; right: 12px; top: 56px; /* top right: never over the message box */ display: grid; gap: 8px; z-index: 120; max-width: min(420px, calc(100% - 24px)); }
 .af-toast { background: var(--af-popover); border: 1px solid var(--af-border); border-left: 3px solid var(--st, var(--af-running)); border-radius: var(--af-radius); padding: 8px 10px; box-shadow: 0 8px 24px rgba(0,0,0,.2); font-size: 12px; }
 .af-replay-bar { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: color-mix(in srgb, var(--af-review) 16%, var(--af-card)); border-bottom: 1px solid var(--af-border); font-size: 12px; }
 .af-replay-bar input[type='range'] { flex: 1; }

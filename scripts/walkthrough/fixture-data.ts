@@ -6,6 +6,9 @@ import { makeAgent, makeRun, makeTask } from '../../test/helpers/fixtures.ts'
 
 const MIN = 60_000
 
+/** A small test image (blue 64×40 PNG) for the chat's image display. */
+export const FIXTURE_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAEAAAAAoCAIAAADBrGu+AAAAS0lEQVR4nO3PQQ3AIADAQMAW7hDNeyJ4XJb0FLRznzv+bOmAVw1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oHxGHAgPBvAjlAAAAAElFTkSuQmCC'
+
 export function fixtureState(now: number): FlowState {
   const state = emptyState()
   state.generatedAt = now
@@ -50,9 +53,9 @@ export function fixtureHistory(now: number) {
 /** The live worker's conversation; `extra` replies are appended as the test "streams" output. */
 export function fixtureConversation(extra: string[]) {
   const base = [
-    { id: 'm1', role: 'user', ts: Date.now() - 10 * MIN, blocks: [{ type: 'text', text: 'Implement the session API for the login page.' }] },
+    { id: 'm1', role: 'user', ts: Date.now() - 10 * MIN, blocks: [{ type: 'text', text: 'Implement the session API for the login page.' }, { type: 'image', image: { ref: 'fx-paste|1', mediaType: 'image/png', bytes: 1200 } }] },
     { id: 'm2', role: 'assistant', ts: Date.now() - 9 * MIN, blocks: [{ type: 'text', text: 'Looking at the existing auth code first.' }, { type: 'tool-call', name: 'Grep', input: '{"pattern":"login"}' }] },
-    { id: 'm3', role: 'user', ts: Date.now() - 9 * MIN, blocks: [{ type: 'tool-result', output: 'src/auth/login.ts:14 export function login()', isError: false }] },
+    { id: 'm3', role: 'user', ts: Date.now() - 9 * MIN, blocks: [{ type: 'tool-result', output: 'src/auth/login.ts:14 export function login()', isError: false, images: [{ ref: 'fx-shot|0|0', mediaType: 'image/png', bytes: FIXTURE_PNG.length * 0.75 }] }] },
     { id: 'm4', role: 'assistant', ts: Date.now() - 8 * MIN, blocks: [{ type: 'text', text: 'Found the login handler. Adding POST /session next.' }] }
   ]
   const more = extra.map((text, i) => ({ id: `x${i}`, role: 'assistant', ts: Date.now(), blocks: [{ type: 'text', text }] }))

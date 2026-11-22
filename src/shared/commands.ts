@@ -29,6 +29,11 @@ export type CommandKind =
   | 'agent.prompt'
   | 'agent.image'
   | 'viewer.ping'
+  | 'agent.attach'
+  | 'star.visit'
+  | 'star.answer'
+  | 'update.check'
+  | 'update.run'
 
 export type CommandRequest = {
   requestId: string
@@ -58,12 +63,14 @@ export const ALL_COMMANDS: readonly CommandKind[] = [
   'terminal.focus', 'terminal.read', 'agent.launch', 'agent.resume', 'agent.stop', 'agent.readOutput',
   'task.create', 'task.update', 'task.cancel', 'task.retry', 'task.dispatch', 'gate.resolve',
   'worktree.create', 'worktree.open', 'worktree.inspect', 'message.send', 'model.change',
-  'labels.update', 'history.list', 'history.load', 'dashboard.info', 'entity.detail', 'dashboard.enable', 'dashboard.controls', 'agent.prompt', 'agent.image', 'viewer.ping'
+  'labels.update', 'history.list', 'history.load', 'dashboard.info', 'entity.detail', 'dashboard.enable', 'dashboard.controls', 'agent.prompt', 'agent.image', 'viewer.ping', 'agent.attach', 'star.visit', 'star.answer', 'update.check', 'update.run'
 ]
 
 /** Commands that only read state; safe for the dashboard without control rights. */
 export const READ_ONLY_COMMANDS: ReadonlySet<CommandKind> = new Set([
-  'terminal.read', 'agent.readOutput', 'worktree.inspect', 'history.list', 'history.load', 'dashboard.info', 'entity.detail', 'agent.image', 'viewer.ping'
+  'terminal.read', 'agent.readOutput', 'worktree.inspect', 'history.list', 'history.load', 'dashboard.info', 'entity.detail', 'agent.image', 'viewer.ping',
+  // Only Agent Flow's own "star the project" prompt state; nothing in Orca changes.
+  'star.visit', 'star.answer', 'update.check'
 ])
 
 export class ValidationError extends Error {
@@ -78,6 +85,7 @@ type FieldSpec =
 
 const ID = /^[A-Za-z0-9_:.\-/@]{1,400}$/
 const AGENT = /^[a-z0-9][a-z0-9-]{0,40}$/
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const MODEL = /^[A-Za-z0-9_.:@/\-[\]]{1,120}$/
 const EFFORT = /^[a-z]{1,20}$/
 const TASK_STATUS = ['pending', 'ready', 'dispatched', 'completed', 'failed', 'blocked'] as const
@@ -175,7 +183,27 @@ export const COMMAND_PARAMS: Record<CommandKind, Record<string, FieldSpec>> = {
   /** A visible UI says it is still open, so the worker keeps its fast pace. */
   'viewer.ping': {},
   'agent.image': { agentId: { type: 'string', required: true, pattern: ID }, ref: { type: 'string', required: true, max: 200, pattern: /^[A-Za-z0-9_.:-]{1,120}\|\d{1,4}(\|\d{1,4})?$/ }, offset: { type: 'string', pattern: /^\d{1,9}$/ } },
-  'agent.prompt': { agentId: { type: 'string', required: true, pattern: ID }, text: { type: 'string', required: true, max: 20000 } },
+  'agent.prompt': {
+    agentId: { type: 'string', required: true, pattern: ID },
+    text: { type: 'string', max: 20000 },
+    /** Images uploaded with agent.attach (their ids, never paths). */
+    attachments: { type: 'stringArray', maxItems: 5, pattern: UUID }
+  },
+  /** Records today's visit; answers whether to show the "star on GitHub" prompt now. */
+  /** Is a newer release out? (installed copies only; cached for 6 hours unless forced) */
+  'update.check': { force: { type: 'boolean' } },
+  /** Runs `orca plugin update` for this plugin. */
+  'update.run': {},
+  'star.visit': {},
+  'star.answer': { answer: { type: 'string', required: true, oneOf: ['starred', 'later', 'never'] } },
+  /** One base64 chunk of an image for the message box; the last one (`done`) saves it. */
+  'agent.attach': {
+    uploadId: { type: 'string', required: true, pattern: UUID },
+    mediaType: { type: 'string', required: true, oneOf: ['image/png', 'image/jpeg', 'image/webp', 'image/gif'] },
+    chunk: { type: 'string', required: true, max: 50_000, pattern: /^[A-Za-z0-9+/]*={0,2}$/ },
+    offset: { type: 'string', required: true, pattern: /^\d{1,9}$/ },
+    done: { type: 'boolean' }
+  },
   'dashboard.controls': { enabled: { type: 'boolean', required: true } },
   'dashboard.enable': { enabled: { type: 'boolean', required: true } },
   'entity.detail': { key: { type: 'string', required: true, max: 420, pattern: /^(task|message):[A-Za-z0-9_:.\-]{1,400}$/ } }

@@ -3,6 +3,8 @@ import assert from 'node:assert/strict'
 import type { CommandResponse } from '../src/shared/commands.ts'
 import { newAgent } from '../src/worker/context.ts'
 import { command, makeRouter } from './helpers/router-setup.ts'
+import { AttachmentStore } from '../src/worker/commands/attachments.ts'
+import { tempDir } from './helpers/fixtures.ts'
 
 function errorOf(response: CommandResponse) {
   assert.equal(response.ok, false, JSON.stringify(response))
@@ -92,6 +94,31 @@ describe('CommandRouter: execution', () => {
     assert.equal(response.ok, true, JSON.stringify(response))
     assert.equal((response as { result: { events: boolean } }).result.events, true)
     assert.deepEqual(interest, ['term_agent'])
+  })
+
+  it('sends attached images as @"path" mentions, only files Agent Flow saved', async () => {
+    const tmp = await tempDir()
+    try {
+      const attachments = new AttachmentStore(tmp.dir)
+      const sent: string[] = []
+      const { router, ctx } = makeRouter({ attachments, host: { 'terminal.sendText': (p: unknown) => (sent.push((p as { text: string }).text), { accepted: true }) } })
+      ctx.store.upsertAgent('t_claude', 1, { terminalId: 'tx', live: true, state: 'working', agent: 'claude' }, () => newAgent('t_claude', 'agent', 1))
+      const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+      const up = await router.handle(command('agent.attach', { uploadId: '00000000-0000-4000-8000-000000000001', mediaType: 'image/png', chunk: png, offset: '0', done: true }))
+      assert.equal(up.ok, true, JSON.stringify(up))
+      const attachmentId = (up as { result: { attachmentId: string } }).result.attachmentId
+      const response = await router.handle(command('agent.prompt', { agentId: 't_claude', text: 'Look at this', attachments: [attachmentId] }))
+      assert.equal(response.ok, true, JSON.stringify(response))
+      assert.match(sent[0], /^Look at this @".*agent-flow-paste-\d+\.png"$/)
+      const imageOnly = await router.handle(command('agent.prompt', { agentId: 't_claude', attachments: [attachmentId] }))
+      assert.equal(imageOnly.ok, true, 'an image alone is a message')
+      const forged = await router.handle(command('agent.prompt', { agentId: 't_claude', text: 'x', attachments: ['00000000-0000-4000-8000-000000000099'] }))
+      assert.equal(errorOf(forged).error.code, 'not_found')
+      const badPath = await router.handle(command('agent.prompt', { agentId: 't_claude', text: 'x', attachments: ['/etc/passwd'] }))
+      assert.equal(errorOf(badPath).error.code, 'invalid_params', 'paths are never accepted, only ids')
+    } finally {
+      await tmp.cleanup()
+    }
   })
 
   it('terminal.read strips ANSI and redacts lines', async () => {

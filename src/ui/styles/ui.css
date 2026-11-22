@@ -147,3 +147,18 @@
 /* Radix wraps content in a display:table element, which grows to fit long lines and breaks
    ellipsis; a block keeps the content as wide as the panel. The chat thread keeps its column layout. */
 .af-ui-scroll-viewport > div { display: block !important; min-width: 0 !important; }
+
+/* "Star on GitHub" prompt: a small card at the bottom left, above the canvas controls */
+.af-star { position: fixed; left: 16px; bottom: 16px; z-index: 110; display: flex; gap: 10px; align-items: flex-start; width: min(390px, calc(100vw - 32px)); padding: 12px 10px 12px 12px; background: var(--af-popover); color: var(--af-fg); border: 1px solid var(--af-border); border-radius: calc(var(--af-radius) + 4px); box-shadow: 0 12px 32px rgb(0 0 0 / .22); animation: af-ui-in .18s ease-out; }
+.af-star-icon { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; flex: none; color: #f59e0b; background: color-mix(in srgb, #f59e0b 14%, transparent); }
+.af-star-icon svg, .af-star-actions .primary svg { fill: currentColor; }
+.af-star-body { display: grid; gap: 3px; font-size: 13px; min-width: 0; }
+.af-star-body > span { color: var(--af-muted-fg); font-size: 12.5px; }
+.af-star-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.af-star-actions .primary { display: inline-flex; align-items: center; gap: 5px; }
+.af-star-close { margin: -4px -2px 0 auto; flex: none; }
+@media (prefers-reduced-motion: reduce) { .af-star { animation: none; } }
+
+/* "A new version is available" banner under the toolbar */
+.af-banner.af-update { background: color-mix(in srgb, var(--af-running) 10%, var(--af-card)); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; border-left: 3px solid var(--af-running); }
+.af-banner.af-update > span { flex: 1; min-width: 180px; }

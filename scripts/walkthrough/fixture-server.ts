@@ -4,7 +4,7 @@
 import { createServer, type ServerResponse } from 'node:http'
 import { readFile } from 'node:fs/promises'
 import { extname, join, resolve, sep } from 'node:path'
-import { fixtureConversation, fixtureHistory, fixtureState, fixtureSubagents } from './fixture-data.ts'
+import { FIXTURE_PNG, fixtureConversation, fixtureHistory, fixtureState, fixtureSubagents } from './fixture-data.ts'
 
 const MIME: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml' }
 
@@ -18,6 +18,10 @@ export async function startFixtureServer(uiDir: string) {
   const streams = new Set<ServerResponse>()
   const extraReplies: string[] = []
   const root = resolve(uiDir)
+  /** The star prompt shows only after /__test/star-on (it would cover other steps). */
+  let starOn = false
+  /** Pretend a newer release exists after /__test/update-on. */
+  let updateOn = false
   const initiallyLive = new Set(Object.values(state.agents).filter((a) => a.live).map((a) => a.id))
   const initialState = new Map(Object.values(state.agents).map((a) => [a.id, a.state]))
   /** The live worker "writes" a reply: the next read includes it, and views are told at once. */
@@ -34,6 +38,16 @@ export async function startFixtureServer(uiDir: string) {
         return history.records[String(params.runId) as keyof typeof history.records] ?? null
       case 'agent.readOutput':
         return params.agentId === 'w_live' ? { ...fixtureConversation(extraReplies), version: `fx${String(extraReplies.length).padStart(8, '0')}` } : { kind: 'lines', source: 'terminal', lines: ['[Test fixture] no output for this agent'], truncated: false, version: 'fx00000000' }
+      case 'update.check':
+        return { current: '0.1.5', latest: updateOn ? '0.1.6' : null, newer: updateOn, releaseUrl: 'https://github.com/SokpisethNhoeun/agent-flow/releases/tag/v0.1.6', pluginKey: 'sokpisethnhoeun.agent-flow' }
+      case 'update.run':
+        return { updated: false, approveCommand: 'orca plugin update sokpisethnhoeun.agent-flow --approve ap1-0000000000000000test', reason: 'The new version asks for more access, so Orca needs your approval.' }
+      case 'star.visit':
+        return { show: starOn, url: 'https://github.com/SokpisethNhoeun/agent-flow' }
+      case 'agent.attach':
+        return params.done === true ? { attachmentId: crypto.randomUUID(), bytes: Math.floor(String(params.chunk).length * 0.75) } : { received: Number(params.offset) + String(params.chunk).length }
+      case 'agent.image':
+        return { mediaType: 'image/png', total: FIXTURE_PNG.length, chunk: Number(params.offset ?? 0) === 0 ? FIXTURE_PNG : '' }
       case 'dashboard.info':
         return { enabled: true, url: null }
       case 'worktree.inspect':
@@ -51,6 +65,14 @@ export async function startFixtureServer(uiDir: string) {
       const chunks: Buffer[] = []
       for await (const chunk of req) chunks.push(chunk as Buffer)
       streamReply(String((JSON.parse(Buffer.concat(chunks).toString('utf8')) as { text?: unknown }).text ?? ''))
+      return json(res, { ok: true })
+    }
+    if (url.pathname === '/__test/update-on' && req.method === 'POST') {
+      updateOn = true
+      return json(res, { ok: true })
+    }
+    if (url.pathname === '/__test/star-on' && req.method === 'POST') {
+      starOn = true
       return json(res, { ok: true })
     }
     // One agent changes state (e.g. becomes blocked), as a single live update.
@@ -103,6 +125,9 @@ export async function startFixtureServer(uiDir: string) {
     if (url.pathname === '/api/command' && req.method === 'POST') {
       const chunks: Buffer[] = []
       for await (const chunk of req) chunks.push(chunk as Buffer)
+      // The strictest real limit: Orca's panel frame refuses messages over 66 560 bytes (the dashboard
+      // allows 128 KiB), so a request too big for the panel fails here too.
+      if (Buffer.concat(chunks).length > 66_560) return json(res, { ok: false, error: { code: 'too_large', message: 'Request body too large.' } })
       const body = JSON.parse(Buffer.concat(chunks).toString('utf8')) as { kind: string; params?: Record<string, unknown>; confirmed?: boolean }
       commands.push({ kind: body.kind, params: body.params ?? {}, confirmed: body.confirmed === true })
       const result = answer(body.kind, body.params ?? {})

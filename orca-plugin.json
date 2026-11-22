@@ -3,7 +3,7 @@
   "manifestVersion": 2,
   "id": "agent-flow",
   "name": "Agent Flow",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Live n8n-style canvas of your agents, subagents, orchestration tasks, handoffs and worktrees, with controls.",
   "author": {
     "name": "Nhoeun Sokpiseth",
@@ -115,9 +115,9 @@
       {
         "key": "dashboardEnabled",
         "title": "Browser dashboard",
-        "description": "Serve the same live canvas on 127.0.0.1 so you can open it in a browser tab. Only this computer can reach it, and it needs a secret token.",
+        "description": "Serve the same live canvas on 127.0.0.1 so you can open it in a browser tab. On by default. Only this computer can reach it, and it needs a secret token.",
         "type": "boolean",
-        "default": false
+        "default": true
       },
       {
         "key": "dashboardPort",
@@ -131,16 +131,16 @@
       {
         "key": "dashboardControls",
         "title": "Allow controls from the browser dashboard",
-        "description": "Off by default: the browser dashboard is view-only until you turn this on.",
+        "description": "On by default: the browser dashboard can use the same controls as the panel (stop, retry, send messages). Turn off to make it view-only.",
         "type": "boolean",
-        "default": false
+        "default": true
       },
       {
         "key": "actAsCoordinator",
         "title": "Act as the Run coordinator",
-        "description": "Orca only lets a Run's coordinator create, retry or dispatch tasks. When on, Agent Flow runs those actions with the coordinator's handle after you confirm. When off, it shows the exact command to run in the coordinator.",
+        "description": "On by default. Orca only lets a Run's coordinator create, retry or dispatch tasks; Agent Flow runs those actions with the coordinator's handle after you confirm each one. Turn off to get the exact command to run in the coordinator instead.",
         "type": "boolean",
-        "default": false
+        "default": true
       },
       {
         "key": "cliPath",
@@ -153,6 +153,13 @@
         "key": "chatSend",
         "title": "Send prompts into chat sessions (experimental)",
         "description": "Orca's plugin API cannot message chat sessions yet, so Agent Flow uses Orca's own local runtime connection (the one the orca CLI and Orca's mobile app use) for this one action. It may stop working after an Orca update; it then says so instead of sending. Turn off to disable.",
+        "type": "boolean",
+        "default": true
+      },
+      {
+        "key": "checkUpdates",
+        "title": "Check for updates",
+        "description": "On by default. Every 6 hours Agent Flow asks GitHub (one public request, nothing personal sent) whether a newer version is released, and shows an Update button when there is one. Updating uses Orca's own `orca plugin update`.",
         "type": "boolean",
         "default": true
       }

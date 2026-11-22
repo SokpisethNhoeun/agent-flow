@@ -1,3 +1,4 @@
+import type { AttachmentStore } from '../../src/worker/commands/attachments.ts'
 // Builds a CommandRouter over the fake context with a real Persistence in a temp dir.
 import type { LabelConfig } from '../../src/shared/model.ts'
 import { CommandRouter } from '../../src/worker/commands/router.ts'
@@ -11,6 +12,7 @@ export type RouterSetupOptions = {
   actAsCoordinator?: boolean
   coordinatorHandle?: string | null
   persistenceDir?: string
+  attachments?: AttachmentStore
 }
 
 export function makeRouter(options: RouterSetupOptions = {}) {
@@ -36,6 +38,7 @@ export function makeRouter(options: RouterSetupOptions = {}) {
     fullText: () => null,
     claudeTranscriptPath: async () => null,
     noteOutputInterest: (agentId) => void interest.push(agentId),
+    attachments: options.attachments,
     setDashboard: async (enabled) => ({ enabled, url: enabled ? 'http://127.0.0.1:1/#token=x' : null })
   })
   return { ...fake, router, settings, ownTerminals, labelUpdates, refreshes: () => refreshes, interest }

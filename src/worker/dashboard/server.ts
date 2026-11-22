@@ -28,6 +28,8 @@ const STATIC_FILES = new Set(['dashboard.html', 'app.js', 'app.css', 'icon.svg',
 /** Code-split UI chunks that esbuild names `chunks/<name>-<hash>.js` (loaded on demand). */
 const CHUNK_FILE = /^chunks\/[A-Za-z0-9_-]{1,80}\.js$/
 const MAX_BODY = 128 * 1024
+/** Read (and discard) at most this much of an oversized body before cutting the connection. */
+const MAX_DRAIN = 4 * 1024 * 1024
 const MAX_CLIENTS = 8
 const brotli = promisify(brotliCompress)
 
@@ -110,7 +112,12 @@ export class DashboardServer {
       const origin = req.headers.origin
       if (origin && origin !== `http://127.0.0.1:${port}` && origin !== `http://localhost:${port}`) return sendJson(res, 403, { ok: false, error: { code: 'forbidden', message: 'Cross-origin request refused.' } })
       if (!(req.headers['content-type'] ?? '').startsWith('application/json')) return sendJson(res, 415, { ok: false, error: { code: 'unsupported_media', message: 'Send JSON.' } })
-      const body = await readBody(req)
+      let body: string
+      try {
+        body = await readBody(req)
+      } catch {
+        return sendJson(res, 413, { ok: false, error: { code: 'too_large', message: 'Request body too large.' } })
+      }
       let parsed: unknown
       try {
         parsed = JSON.parse(body)
@@ -213,14 +220,12 @@ function readBody(req: IncomingMessage): Promise<string> {
     const chunks: Buffer[] = []
     req.on('data', (chunk: Buffer) => {
       size += chunk.length
-      if (size > MAX_BODY) {
-        reject(new Error('Body too large'))
-        req.destroy()
-        return
-      }
-      chunks.push(chunk)
+      // Too big: stop keeping it but read to the end, so the 413 answer reaches the client; only a
+      // runaway upload is cut off.
+      if (size > MAX_DRAIN) req.destroy()
+      else if (size <= MAX_BODY) chunks.push(chunk)
     })
-    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')))
+    req.on('end', () => (size > MAX_BODY ? reject(new Error('Body too large')) : resolve(Buffer.concat(chunks).toString('utf8'))))
     req.on('error', reject)
   })
 }

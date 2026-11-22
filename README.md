@@ -93,6 +93,12 @@ agents in terminals, and both sources merge into one node (same tool-call id).
 
 ## Chat view
 
+**Send images**: paste (Ctrl+V), drop, or use 📎 in the message box (PNG, JPEG, WebP, GIF; up to 10 MB
+each, 5 per message). Chat sessions get them as real attachments, the way Orca's own chat sends them;
+Claude in a terminal reads them as attached files; other agents get the file path. Images are saved
+under `agent-session-attachments/<id>/` (where Orca keeps chat attachments) and only files Agent Flow
+saved itself can be sent.
+
 The inspector's **Output & prompt** tab shows the agent's conversation as a chat, built on
 [assistant-ui](https://www.assistant-ui.com): your messages and the agent's replies as bubbles,
 markdown and code, collapsible thinking and tool-call cards (each tool's input and output), the
@@ -171,9 +177,16 @@ session have no terminal handle, so they always use the copy-the-command path.
 
 Under **Settings → Plugins → Agent Flow**:
 
-- **Browser dashboard** (off by default), **Dashboard port** (4790; the next free one is used),
-  **Allow controls from the browser dashboard** (off by default: view-only until you turn it on).
-- **Act as the Run coordinator** (off).
+Everything is **on by default**, so after you approve the plugin it works fully with no setup;
+turn anything off here:
+
+- **Browser dashboard** (on), **Dashboard port** (4790; the next free one is used),
+  **Allow controls from the browser dashboard** (on; turn off to make the dashboard view-only).
+- **Act as the Run coordinator** (on; each action still asks you to confirm).
+- **Check for updates** (on): every 6 hours Agent Flow asks GitHub for its newest release (one public
+  request; nothing about you is sent). When a newer version is out, a banner under the toolbar offers
+  **Update** (runs `orca plugin update`; if the new version needs more access, it shows Orca's
+  approve command to copy instead), **What's new** and **Later**. Development folders never check.
 - **Orca CLI path**: leave empty. On many Linux desktops `/usr/bin/orca` is the GNOME *screen
   reader*; Agent Flow detects it and never runs it.
 

@@ -5,7 +5,7 @@ import { AssistantRuntimeProvider, ThreadPrimitive, useExternalStoreRuntime, typ
 import { useCallback, useMemo } from 'react'
 import type { AgentRecord } from '../../shared/model.ts'
 import { ScrollArea } from '../components/ui/ScrollArea.tsx'
-import { ChatComposer } from './ChatComposer.tsx'
+import { ChatComposer, type SendFn } from './ChatComposer.tsx'
 import { ChatAgentContext } from './ChatImage.tsx'
 import { AssistantMessage, UserMessage } from './ChatMessages.tsx'
 import { WorkingIndicator } from './ChatParts.tsx'
@@ -16,7 +16,7 @@ type Props = {
   messages: ConversationMessage[]
   truncated: boolean
   /** null when sending is not possible; the string explains why. */
-  send: ((text: string) => Promise<boolean>) | null
+  send: SendFn | null
   sendNote: string
   working: boolean
   onLoadEarlier?: (() => void) | null
@@ -30,7 +30,7 @@ export function AgentChat({ agent, messages, truncated, send, sendNote, working,
   const onNew = useCallback(
     async (message: AppendMessage) => {
       const text = message.content.map((part) => (part.type === 'text' ? part.text : '')).join('\n').trim()
-      if (text && send) await send(text)
+      if (text && send) await send(text, [])
     },
     [send]
   )
