@@ -104,6 +104,69 @@ describe('SubagentFilesAdapter', () => {
       await cleanup()
     }
   })
+
+  it('finds subagents a Workflow run started (subagents/workflows/<run>/), titled by phase', async () => {
+    const { adapter, fake, cleanup, transcript } = await setup({ description: 'Top level', toolUseId: 'toolu_top', finished: true })
+    try {
+      const runDir = join(transcript, '..', 'workflows', 'wf_abc')
+      await mkdir(runDir, { recursive: true })
+      const line = { type: 'assistant', timestamp: '2026-11-22T06:00:00.000Z', message: { role: 'assistant', content: [{ type: 'text', text: 'checking' }] } }
+      await writeFile(join(runDir, 'agent-w1.jsonl'), JSON.stringify(line) + '\n')
+      await writeFile(join(runDir, 'agent-w1.meta.json'), JSON.stringify({ agentType: 'workflow-subagent', description: 'check auth routes', workflowPhase: 'Review', inWorkflowRun: true }))
+      await adapter.scan()
+      const sub = fake.ctx.store.read().agents['sub:file:agent-w1']
+      assert.ok(sub, 'nested workflow subagent is found')
+      assert.equal(sub.parentId, 'term:p')
+      assert.equal(sub.title, 'Review: check auth routes')
+      assert.equal(sub.subagentType, 'workflow-subagent')
+      assert.equal(sub.live, true, 'just written: working')
+      assert.ok(fake.ctx.store.read().agents['sub:toolu_top'], 'top-level subagents still found')
+    } finally {
+      await cleanup()
+    }
+  })
+
+  it('a session with no subagents yet picks up its first one on the next scan', async () => {
+    const { dir, cleanup } = await (await import('./helpers/fixtures.ts')).tempDir()
+    try {
+      const home = join(dir, 'home')
+      const project = join(home, 'projects', '-proj')
+      await mkdir(project, { recursive: true })
+      await writeFile(join(project, 'sess-2.jsonl'), '')
+      const fake = makeContext()
+      fake.ctx.now = () => Date.now()
+      const parent = makeAgent('term:q', { sessionId: 'sess-2', agent: 'claude', live: true, state: 'working', lastSeenAt: Date.now() })
+      fake.ctx.store.upsertAgent(parent.id, Date.now(), parent, () => parent)
+      const adapter = new SubagentFilesAdapter(fake.ctx, () => [home])
+      await adapter.scan()
+      const subDir = join(project, 'sess-2', 'subagents')
+      await mkdir(subDir, { recursive: true })
+      await writeFile(join(subDir, 'agent-n1.jsonl'), '')
+      await writeFile(join(subDir, 'agent-n1.meta.json'), JSON.stringify({ description: 'New one', toolUseId: 'toolu_new' }))
+      await adapter.scan()
+      assert.ok(fake.ctx.store.read().agents['sub:toolu_new'], 'no one-minute wait for the folder to be found again')
+    } finally {
+      await cleanup()
+    }
+  })
+
+  it('a quiet subagent in the middle of a tool call (long build) still counts as working', async () => {
+    const { adapter, fake, cleanup, transcript } = await setup({ description: 'Build', toolUseId: 'toolu_build', finished: false })
+    try {
+      const call = { type: 'assistant', timestamp: '2026-11-22T06:00:05.000Z', message: { role: 'assistant', content: [{ type: 'tool_use', name: 'Bash', input: { command: 'npm test' } }] } }
+      await writeFile(transcript, JSON.stringify(call) + '\n')
+      const { utimes } = await import('node:fs/promises')
+      const t = (Date.now() - 5 * 60 * 1000) / 1000
+      await utimes(transcript, t, t)
+      await utimes(join(transcript, '..', 'agent-x1.meta.json'), t, t)
+      await adapter.scan()
+      const sub = fake.ctx.store.read().agents['sub:toolu_build']
+      assert.equal(sub.live, true)
+      assert.equal(sub.state, 'working')
+    } finally {
+      await cleanup()
+    }
+  })
 })
 
 describe('toMessage', () => {

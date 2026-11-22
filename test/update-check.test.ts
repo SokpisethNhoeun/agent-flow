@@ -39,14 +39,46 @@ test('reports a newer release, caches it, and stays quiet offline or when turned
     const info = await checker.check()
     assert.deepEqual(info, { current: '0.1.4', latest: '0.1.5', newer: true, releaseUrl: 'https://github.com/SokpisethNhoeun/agent-flow/releases/tag/v0.1.5', pluginKey: 'sokpisethnhoeun.agent-flow' })
     await checker.check()
-    assert.equal(calls, 1, 'cached for 6 hours')
+    assert.equal(calls, 1, 'an update found is kept (6 hours)')
     enabled = false
     assert.equal((await checker.check(true)).newer, false, 'setting off: no request, no notice')
     assert.equal(calls, 1)
     const offline = new UpdateChecker(root, () => true, async () => { throw new Error('offline') })
     assert.equal((await offline.check()).newer, false)
-    const sameVersion = new UpdateChecker(root, () => true, async () => ({ ok: true, status: 200, json: async () => ({ tag_name: 'v0.1.4' }) }))
+    // No update yet: asked again after 10 minutes, so a fresh release shows up soon.
+    let now = 0
+    let tag = 'v0.1.4'
+    let sameCalls = 0
+    const sameVersion = new UpdateChecker(root, () => true, async () => (sameCalls++, { ok: true, status: 200, json: async () => ({ tag_name: tag }) }), () => now)
     assert.equal((await sameVersion.check()).newer, false)
+    tag = 'v0.1.5'
+    now = 5 * 60 * 1000
+    assert.equal((await sameVersion.check()).newer, false, 'within 10 minutes: cached')
+    now = 11 * 60 * 1000
+    assert.equal((await sameVersion.check()).newer, true, 'after 10 minutes: the new release is found')
+    assert.equal(sameCalls, 2)
+  } finally {
+    await tmp.cleanup()
+  }
+})
+
+test('rechecks send the ETag, and a 304 answer reuses the last release', async () => {
+  const { tmp, root } = await pluginDir('0.1.4')
+  try {
+    let now = 0
+    const sent: (string | undefined)[] = []
+    const fetcher = async (_url: string, init: { headers: Record<string, string> }) => {
+      sent.push(init.headers['If-None-Match'])
+      if (init.headers['If-None-Match'] === '"e1"') return { ok: false, status: 304, json: async () => ({}), headers: { get: () => '"e1"' } }
+      return { ok: true, status: 200, json: async () => ({ tag_name: 'v0.1.4' }), headers: { get: (name: string) => (name === 'etag' ? '"e1"' : null) } }
+    }
+    const checker = new UpdateChecker(root, () => true, fetcher, () => now)
+    assert.equal((await checker.check()).latest, '0.1.4')
+    now = 11 * 60 * 1000
+    const again = await checker.check()
+    assert.deepEqual(sent, [undefined, '"e1"'])
+    assert.equal(again.latest, '0.1.4', '304: same answer as before, not treated as a failure')
+    assert.equal(again.newer, false)
   } finally {
     await tmp.cleanup()
   }

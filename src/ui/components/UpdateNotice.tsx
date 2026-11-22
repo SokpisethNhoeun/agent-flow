@@ -1,5 +1,5 @@
-// "Agent Flow 0.1.6 is available": a slim banner under the toolbar when a newer release is out (the
-// worker checks GitHub every 6 hours, installed copies only). Update runs Orca's `orca plugin update`;
+// "Agent Flow 0.1.61 is available": a slim banner under the toolbar when a newer release is out (the
+// worker asks GitHub at most every 10 minutes while there is none, installed copies only). Update runs Orca's `orca plugin update`;
 // a version that needs new access shows Orca's approve command to copy instead.
 import { useEffect, useState } from 'react'
 import { newRequestId } from '../../shared/commands.ts'
@@ -10,7 +10,11 @@ import { Button } from './primitives.tsx'
 type Info = { current: string; latest: string | null; newer: boolean; releaseUrl: string | null }
 type Result = { updated: true; version: string | null } | { updated: false; approveCommand: string | null; reason: string }
 
-const RECHECK_MS = 6 * 60 * 60 * 1000
+/**
+ * The panel asks every 10 minutes and whenever it is shown again; the worker answers from its cache,
+ * so this is cheap, and a new release appears within about 10 minutes of being published.
+ */
+const RECHECK_MS = 10 * 60 * 1000
 const laterKey = (version: string) => `agent-flow:update-later:${version}`
 
 function snoozed(version: string): boolean {
@@ -34,9 +38,16 @@ export function UpdateNotice() {
       })
     check()
     const timer = setInterval(check, RECHECK_MS)
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') check()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', onVisible)
     return () => {
       alive = false
       clearInterval(timer)
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', onVisible)
     }
   }, [client])
 

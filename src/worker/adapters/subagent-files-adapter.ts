@@ -1,7 +1,8 @@
 // Claude subagents for every Claude session (terminal or chat), from the files Claude Code itself
 // writes: <projects>/<project>/<session>/subagents/agent-<id>.meta.json (+ .jsonl transcript).
 // The meta file names the spawning tool call (`toolUseId`), the same id Orca's tool hook reports,
-// so a subagent seen by both sources is one node. Read-only; nothing is written.
+// so a subagent seen by both sources is one node. Subagents a Workflow run starts are written one
+// level deeper, in <session>/subagents/workflows/<run id>/, and are read the same way. Read-only.
 import { open, readdir, readFile, realpath, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -9,7 +10,7 @@ import type { AgentRecord } from '../../shared/model.ts'
 import { redactAndTruncate } from '../../shared/redact.ts'
 import { newAgent, type WorkerContext } from '../context.ts'
 
-type Meta = { agentType?: string; description?: string; toolUseId?: string; model?: string; finished?: boolean; spawnDepth?: number }
+type Meta = { agentType?: string; description?: string; toolUseId?: string; model?: string; finished?: boolean; spawnDepth?: number; workflowPhase?: string }
 
 /**
  * A subagent still writing within this window counts as working, even when its parent's own turn has
@@ -17,6 +18,13 @@ type Meta = { agentType?: string; description?: string; toolUseId?: string; mode
  * If the session really stops, the subagent stops writing and goes quiet within this window.
  */
 const ACTIVE_WRITE_MS = 90_000
+/**
+ * A subagent whose transcript ends with a tool call that has no result yet is running that tool (a
+ * long build or test run writes nothing meanwhile). Trusted for this long after the last write, so a
+ * crashed one does not stay "working" forever.
+ */
+const OPEN_TOOL_MS = 30 * 60 * 1000
+const TAIL_BYTES = 64 * 1024
 const RECENT_SESSION_MS = 6 * 60 * 60 * 1000
 const DIR_RETRY_MS = 60_000
 const MAX_SESSIONS_PER_SCAN = 40
@@ -26,6 +34,7 @@ export class SubagentFilesAdapter {
   private sessionDirs = new Map<string, { dir: string | null; checkedAt: number }>()
   private seenMtime = new Map<string, number>()
   private metaCache = new Map<string, { mtime: number; meta: Meta }>()
+  private openToolCache = new Map<string, { mtime: number; open: boolean }>()
   /** subagent node id → its transcript file, for the Output tab. */
   private transcripts = new Map<string, string>()
   private sessionFiles = new Map<string, string>()
@@ -80,7 +89,9 @@ export class SubagentFilesAdapter {
       .slice(0, MAX_SESSIONS_PER_SCAN)
     for (const parent of parents) {
       const dir = await this.subagentDir(roots, parent.sessionId!, now)
-      if (dir) await this.scanDir(dir, parent, now)
+      if (!dir) continue
+      await this.scanDir(dir, parent, now)
+      for (const runDir of await workflowRunDirs(dir)) await this.scanDir(runDir, parent, now)
     }
   }
 
@@ -97,32 +108,58 @@ export class SubagentFilesAdapter {
     return [...out]
   }
 
+  /**
+   * <project>/<session>/subagents. The session's project folder is looked up once (a full search of
+   * every project); after that, a session with no subagents yet costs one stat per scan, so its first
+   * subagent shows up on the next scan instead of a minute later.
+   */
   private async subagentDir(roots: string[], sessionId: string, now: number): Promise<string | null> {
-    const cached = this.sessionDirs.get(sessionId)
-    if (cached && (cached.dir || now - cached.checkedAt < DIR_RETRY_MS)) return cached.dir
-    let found: string | null = null
-    for (const root of roots) {
-      let projects: string[]
-      try {
-        projects = await readdir(root)
-      } catch {
-        continue
-      }
-      for (const project of projects) {
-        const dir = join(root, project, sessionId, 'subagents')
-        try {
-          if ((await stat(dir)).isDirectory()) {
-            found = dir
-            break
-          }
-        } catch {
-          // not this project
-        }
-      }
-      if (found) break
+    let cached = this.sessionDirs.get(sessionId)
+    if (!cached?.dir && (!cached || now - cached.checkedAt >= DIR_RETRY_MS)) {
+      cached = { dir: await findSessionFolder(roots, sessionId), checkedAt: now }
+      this.sessionDirs.set(sessionId, cached)
     }
-    this.sessionDirs.set(sessionId, { dir: found, checkedAt: now })
-    return found
+    if (!cached.dir) return null
+    const dir = join(cached.dir, sessionId, 'subagents')
+    try {
+      return (await stat(dir)).isDirectory() ? dir : null
+    } catch {
+      return null
+    }
+  }
+
+  /** True when the transcript's last entry is the agent calling a tool (its result not written yet). */
+  private async endsWithOpenToolCall(path: string, mtime: number): Promise<boolean> {
+    const cached = this.openToolCache.get(path)
+    if (cached && cached.mtime === mtime) return cached.open
+    let isOpen = false
+    try {
+      const handle = await open(path, 'r')
+      try {
+        const { size } = await handle.stat()
+        const start = Math.max(0, size - TAIL_BYTES)
+        const { buffer, bytesRead } = await handle.read(Buffer.alloc(size - start), 0, size - start, start)
+        const lines = buffer.subarray(0, bytesRead).toString('utf8').trimEnd().split('\n')
+        for (let i = lines.length - 1; i >= 0; i--) {
+          let entry: { type?: string; message?: { content?: unknown } }
+          try {
+            entry = JSON.parse(lines[i])
+          } catch {
+            continue // a partial first line of the tail
+          }
+          const content = entry.message?.content
+          isOpen = entry.type === 'assistant' && Array.isArray(content) && content.some((block) => (block as { type?: string })?.type === 'tool_use')
+          break
+        }
+      } finally {
+        await handle.close()
+      }
+    } catch {
+      isOpen = false
+    }
+    this.openToolCache.set(path, { mtime, open: isOpen })
+    if (this.openToolCache.size > 500) this.openToolCache.delete(this.openToolCache.keys().next().value!)
+    return isOpen
   }
 
   private async scanDir(dir: string, parent: AgentRecord, now: number): Promise<void> {
@@ -162,7 +199,8 @@ export class SubagentFilesAdapter {
       const existing = this.ctx.store.read().agents[id]
       const writing = now - mtime < ACTIVE_WRITE_MS
       const finished = meta.finished === true
-      const live = !finished && writing
+      const openTool = !finished && !writing && now - mtime < OPEN_TOOL_MS && (await this.endsWithOpenToolCall(transcriptPath, mtime))
+      const live = !finished && (writing || openTool)
       // Unchanged files only need a liveness refresh (a subagent goes quiet when its parent stops).
       if (this.seenMtime.get(id) === mtime && existing && existing.live === live) continue
       this.seenMtime.set(id, mtime)
@@ -177,7 +215,7 @@ export class SubagentFilesAdapter {
           callId: meta.toolUseId ?? null,
           subagentType: meta.agentType ?? existing?.subagentType ?? 'general-purpose',
           description: meta.description ? redactAndTruncate(meta.description, 300) : existing?.description ?? null,
-          title: meta.description ? redactAndTruncate(meta.description, 120) : existing?.title ?? 'Subagent',
+          title: meta.description ? redactAndTruncate(titleOf(meta), 120) : existing?.title ?? 'Subagent',
           model: meta.model ?? existing?.model ?? null,
           runId: parent.runId,
           taskId: parent.taskId,
@@ -201,6 +239,42 @@ export class SubagentFilesAdapter {
         this.ctx.store.emit({ id: `subagent.done:${id}`, ts: mtime, kind: 'subagent.completed', source: 'session-file', entityId: id, targetId: parent.id, runId: parent.runId, summary: `Subagent ${meta.description ?? ''} finished`.trim() })
       }
     }
+  }
+}
+
+/** The project folder holding a session: its transcript (<id>.jsonl) or its own folder (<id>/). */
+async function findSessionFolder(roots: string[], sessionId: string): Promise<string | null> {
+  for (const root of roots) {
+    let projects: string[]
+    try {
+      projects = await readdir(root)
+    } catch {
+      continue
+    }
+    for (const project of projects) {
+      const folder = join(root, project)
+      const found = await Promise.any([stat(join(folder, `${sessionId}.jsonl`)), stat(join(folder, sessionId))]).then(() => true, () => false)
+      if (found) return folder
+    }
+  }
+  return null
+}
+
+/** A workflow subagent's title leads with its phase ("Review: check auth"), unless they say the same. */
+function titleOf(meta: Meta): string {
+  const description = meta.description ?? ''
+  const phase = meta.workflowPhase?.trim()
+  return phase && phase.toLowerCase() !== description.trim().toLowerCase() ? `${phase}: ${description}` : description
+}
+
+/** <subagents>/workflows/<run id>/ folders, one per Workflow run of this session. */
+async function workflowRunDirs(subagentsDir: string): Promise<string[]> {
+  const root = join(subagentsDir, 'workflows')
+  try {
+    const entries = await readdir(root, { withFileTypes: true })
+    return entries.filter((entry) => entry.isDirectory()).map((entry) => join(root, entry.name))
+  } catch {
+    return []
   }
 }
 
