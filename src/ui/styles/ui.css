@@ -1,0 +1,149 @@
+/* Radix-based UI library (components/ui): select, menus, tooltip, switch, segmented, tabs, dialog. */
+
+/* ── Select trigger ─────────────────────────────────────────── */
+.af-ui-select {
+  display: inline-flex; align-items: center; gap: 6px; height: 28px; min-width: 0; max-width: 100%;
+  padding: 0 8px 0 10px; border: 1px solid var(--af-input); border-radius: calc(var(--af-radius) - 2px);
+  background: var(--af-card); color: var(--af-fg); font: inherit; font-size: 12.5px; cursor: pointer; text-align: left;
+  transition: border-color .12s, box-shadow .12s, background .12s;
+}
+.af-ui-select:hover { background: color-mix(in srgb, var(--af-accent) 55%, var(--af-card)); }
+.af-ui-select:focus-visible, .af-ui-select[data-state='open'] { outline: none; border-color: var(--af-ring); box-shadow: 0 0 0 3px color-mix(in srgb, var(--af-ring) 25%, transparent); }
+.af-ui-select[data-disabled] { opacity: .5; cursor: not-allowed; }
+.af-ui-select-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.af-ui-select-chevron { display: inline-flex; color: var(--af-muted-fg); transition: transform .15s; }
+.af-ui-select[data-state='open'] .af-ui-select-chevron { transform: rotate(180deg); }
+.af-field .af-ui-select { width: 100%; height: 32px; }
+
+/* ── Popover surfaces (select list, menus) ──────────────────── */
+.af-ui-popover {
+  z-index: 200; min-width: 180px; max-width: min(420px, calc(100vw - 16px));
+  background: var(--af-popover); color: var(--af-fg); border: 1px solid var(--af-border); border-radius: var(--af-radius);
+  box-shadow: 0 12px 32px rgba(0,0,0,.28), 0 2px 6px rgba(0,0,0,.12); padding: 4px; font-family: var(--af-font); font-size: 12.5px;
+  transform-origin: var(--radix-popper-transform-origin); animation: af-ui-in .12s ease-out;
+}
+.af-ui-select-content { min-width: var(--radix-select-trigger-width); max-height: min(360px, var(--radix-select-content-available-height)); }
+.af-ui-select-viewport { padding: 0; }
+.af-ui-menu.wide { width: min(380px, calc(100vw - 16px)); max-height: min(60vh, var(--radix-dropdown-menu-content-available-height)); overflow-y: auto; }
+.af-ui-label { padding: 6px 8px 4px; font-size: 11px; font-weight: 600; letter-spacing: .02em; text-transform: uppercase; color: var(--af-muted-fg); }
+.af-ui-separator { height: 1px; background: var(--af-border); margin: 4px -4px; }
+.af-ui-scroll { display: flex; justify-content: center; padding: 2px; color: var(--af-muted-fg); cursor: default; }
+.af-ui-empty { padding: 8px; color: var(--af-muted-fg); }
+
+/* ── Items ──────────────────────────────────────────────────── */
+.af-ui-item {
+  position: relative; display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: calc(var(--af-radius) - 3px);
+  cursor: pointer; outline: none; user-select: none; color: var(--af-fg);
+}
+.af-ui-item.rich { align-items: flex-start; padding: 8px; }
+.af-ui-item[data-highlighted] { background: var(--af-accent); color: var(--af-accent-fg); }
+.af-ui-item[data-disabled] { opacity: .45; cursor: not-allowed; }
+.af-ui-item.danger { color: var(--af-destructive); }
+.af-ui-item.danger[data-highlighted] { background: color-mix(in srgb, var(--af-destructive) 14%, transparent); color: var(--af-destructive); }
+.af-ui-item[data-status] .af-ui-item-lead { color: var(--st); }
+.af-ui-item[data-status][data-highlighted] { background: color-mix(in srgb, var(--st) 14%, var(--af-popover)); color: var(--af-fg); }
+.af-ui-item-lead { width: 16px; flex: none; display: inline-flex; justify-content: center; align-items: center; color: var(--af-muted-fg); }
+.af-ui-item-text { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.af-ui-item-text > span:first-child, .af-ui-item-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.af-ui-item.rich .af-ui-item-label { font-weight: 600; }
+.af-ui-item-hint { font-size: 11px; color: var(--af-muted-fg); overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.af-ui-item-meta { font-size: 11px; color: var(--af-muted-fg); white-space: nowrap; flex: none; }
+.af-ui-item-check { display: inline-flex; color: var(--af-running); flex: none; }
+.af-ui-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--af-ready); }
+.af-ui-dot.live { background: var(--af-running); box-shadow: 0 0 0 3px color-mix(in srgb, var(--af-running) 22%, transparent); }
+
+/* ── Tooltip ────────────────────────────────────────────────── */
+.af-ui-tooltip {
+  z-index: 300; max-width: 280px; padding: 5px 8px; border-radius: 6px; font-size: 11.5px; line-height: 1.35;
+  background: var(--af-fg); color: var(--af-bg); box-shadow: 0 6px 18px rgba(0,0,0,.25); animation: af-ui-in .1s ease-out;
+}
+
+/* ── Switch ─────────────────────────────────────────────────── */
+.af-ui-switch-row { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; }
+.af-ui-switch { all: unset; position: relative; width: 28px; height: 16px; border-radius: 999px; background: var(--af-input); transition: background .15s; cursor: pointer; flex: none; }
+.af-ui-switch:focus-visible { box-shadow: 0 0 0 3px color-mix(in srgb, var(--af-ring) 35%, transparent); }
+.af-ui-switch[data-state='checked'] { background: var(--af-running); }
+.af-ui-switch-thumb { display: block; width: 12px; height: 12px; border-radius: 50%; background: #fff; transform: translateX(2px); transition: transform .15s; box-shadow: 0 1px 2px rgba(0,0,0,.3); }
+.af-ui-switch[data-state='checked'] .af-ui-switch-thumb { transform: translateX(14px); }
+
+/* ── Segmented (Radix ToggleGroup) and tabs (Radix Tabs) ────── */
+.af-seg { padding: 2px; gap: 2px; background: color-mix(in srgb, var(--af-muted) 60%, transparent); }
+.af-seg button { border-radius: calc(var(--af-radius) - 3px); transition: background .12s, color .12s; }
+.af-seg button:hover { color: var(--af-fg); }
+.af-seg button[data-state='on'] { background: var(--af-card); color: var(--af-fg); box-shadow: 0 1px 2px rgba(0,0,0,.18); }
+.af-seg button:focus-visible, .af-tabs button:focus-visible { outline: 2px solid var(--af-ring); outline-offset: -2px; }
+.af-tabs button { display: inline-flex; align-items: center; gap: 6px; transition: color .12s, border-color .12s; }
+.af-tabs button:hover { color: var(--af-fg); }
+.af-tabs button[data-state='active'] { color: var(--af-fg); border-bottom-color: var(--af-running); }
+
+/* ── Dialog (Radix Dialog) ──────────────────────────────────── */
+.af-overlay { animation: af-ui-fade .12s ease-out; }
+.af-dialog { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 101; animation: af-ui-pop .14s ease-out; }
+.af-dialog header { display: flex; align-items: center; gap: 8px; }
+.af-dialog-title { flex: 1; margin: 0; font-size: inherit; font-weight: inherit; }
+
+@keyframes af-ui-in { from { opacity: 0; transform: scale(.97) translateY(-2px); } to { opacity: 1; transform: none; } }
+@keyframes af-ui-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes af-ui-pop { from { opacity: 0; transform: translate(-50%, -48%) scale(.98); } to { opacity: 1; transform: translate(-50%, -50%); } }
+@media (prefers-reduced-motion: reduce) { .af-ui-popover, .af-ui-tooltip, .af-overlay, .af-dialog { animation: none; } }
+
+/* Run totals next to the run picker */
+.af-run-summary { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; white-space: nowrap; padding: 2px 8px; border: 1px solid var(--af-border); border-radius: 999px; background: var(--af-card); cursor: default; }
+.af-run-summary:focus-visible { outline: 2px solid var(--af-ring); outline-offset: 1px; }
+.af-run-progress { position: relative; display: inline-flex; width: 42px; height: 5px; border-radius: 3px; background: var(--af-border); overflow: hidden; }
+.af-run-progress > span { height: 100%; background: var(--af-done); }
+.af-run-progress > span.failed { background: var(--af-failed); }
+.af-run-summary-tip { display: grid; gap: 3px; font-size: 12px; max-width: 280px; }
+
+/* Batch actions for several selected cards */
+.af-selection-bar { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 15; display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; white-space: nowrap; max-width: calc(100% - 32px); overflow-x: auto; padding: 5px 6px 5px 12px; font-size: 12px; background: var(--af-popover); color: var(--af-fg); border: 1px solid var(--af-border); border-radius: calc(var(--af-radius) + 2px); box-shadow: 0 8px 24px rgb(0 0 0 / 0.18); animation: af-ui-fade 120ms ease-out; }
+.af-selection-bar > b { margin-right: 4px; white-space: nowrap; }
+
+/* Find in output */
+.af-find { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.af-find .af-input { height: 26px; width: 150px; min-width: 80px; flex: 1 1 150px; font-size: 12px; }
+.af-find { flex: 1 1 auto; justify-content: flex-end; }
+::highlight(af-find) { background-color: #fde047; color: #18181b; }
+
+/* Compare runs */
+.af-dialog.wide { width: min(880px, 100%); }
+.af-compare-bar { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.af-compare-pick { display: inline-flex; align-items: center; gap: 3px; min-width: 30px; font-size: 11px; cursor: pointer; }
+.af-compare-head { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 12px; }
+.af-compare-head b { display: inline-block; max-width: calc(100% - 30px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+.af-compare-table { display: grid; font-size: 12px; border: 1px solid var(--af-border); border-radius: var(--af-radius); overflow: auto; max-height: 55vh; }
+.af-compare-table [role=row] { display: grid; grid-template-columns: minmax(140px, 2fr) minmax(120px, 1.3fr) minmax(120px, 1.3fr) 100px; gap: 8px; align-items: center; padding: 6px 10px; border-top: 1px solid var(--af-border); }
+.af-compare-table [role=row].head { border-top: 0; font-weight: 600; color: var(--af-muted-fg); position: sticky; top: 0; background: var(--af-popover); }
+.af-compare-table [role=row].same { opacity: .65; }
+.af-compare-table [role=cell] { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 640px) { .af-compare-head { grid-template-columns: 1fr; } }
+
+.af-count { display: inline-grid; place-items: center; min-width: 16px; height: 16px; margin-left: 4px; padding: 0 4px; border-radius: 999px; font-size: 10px; font-weight: 600; background: color-mix(in srgb, currentColor 18%, transparent); }
+.react-flow__minimap { opacity: .92; }
+/* Phone-width canvas: the batch bar keeps icons and counts so everything fits without scrolling. */
+@container (max-width: 480px) {
+  .af-selection-bar { left: 8px; right: 8px; transform: none; max-width: none; justify-content: space-between; gap: 4px; padding: 4px 6px; }
+  .af-selection-bar .af-sel-label { display: none; }
+}
+
+/* Radix Scroll Area: thin overlay scrollbars, shown while scrolling or hovering */
+.af-ui-scroll { position: relative; overflow: hidden; min-height: 0; display: flex; flex-direction: column; }
+.af-ui-scroll > .af-ui-scroll-viewport { flex: 1; min-height: 0; width: 100%; height: 100%; border-radius: inherit; }
+.af-ui-scroll-viewport:focus-visible { outline: 2px solid var(--af-ring); outline-offset: -2px; }
+.af-ui-scrollbar { display: flex; touch-action: none; user-select: none; padding: 2px; transition: background-color .15s ease; z-index: 2; }
+.af-ui-scrollbar[data-orientation='vertical'] { width: var(--af-scrollbar-size, 10px); }
+.af-ui-scrollbar[data-orientation='horizontal'] { height: var(--af-scrollbar-size, 10px); flex-direction: column; }
+.af-ui-scrollbar:hover { background: color-mix(in srgb, var(--af-fg) 5%, transparent); }
+.af-ui-scroll-thumb { flex: 1; position: relative; border-radius: 999px; background: var(--af-scrollbar-thumb, color-mix(in srgb, var(--af-fg) 22%, transparent)); }
+.af-ui-scroll-thumb:hover { background: var(--af-scrollbar-thumb-hover, color-mix(in srgb, var(--af-fg) 38%, transparent)); }
+/* Bigger touch target without a bigger look */
+.af-ui-scroll-thumb::before { content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 100%; height: 100%; min-width: 24px; min-height: 24px; }
+.af-scroll-chat { display: flex; flex-direction: column; overflow: hidden; }
+.af-chat-scroll { flex: 1; }
+.af-dialog { display: flex; flex-direction: column; overflow: hidden; }
+.af-dialog-scroll { flex: 1 1 auto; }
+/* Places that still scroll natively (code blocks, menus, tables) get the same thin look */
+.af-app *, .af-ui-menu, .af-dialog { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--af-fg) 25%, transparent) transparent; }
+/* Radix wraps content in a display:table element, which grows to fit long lines and breaks
+   ellipsis; a block keeps the content as wide as the panel. The chat thread keeps its column layout. */
+.af-ui-scroll-viewport > div { display: block !important; min-width: 0 !important; }

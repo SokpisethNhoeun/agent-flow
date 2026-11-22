@@ -1,0 +1,127 @@
+/* React Flow canvas, nodes and edges (n8n-like). */
+.react-flow { --xy-background-color: var(--af-bg); --xy-node-border-radius: 12px; }
+.react-flow__attribution { display: none; }
+.react-flow__controls { box-shadow: none; border: 1px solid var(--af-border); border-radius: var(--af-radius); overflow: hidden; }
+.react-flow__controls-button { background: var(--af-card); border-bottom: 1px solid var(--af-border); color: var(--af-fg); fill: var(--af-fg); }
+.react-flow__controls-button:hover { background: var(--af-accent); }
+.react-flow__controls-button svg { fill: currentColor; }
+.react-flow__minimap { background: var(--af-card); border: 1px solid var(--af-border); border-radius: var(--af-radius); overflow: hidden; }
+.react-flow__minimap-mask { fill: color-mix(in srgb, var(--af-bg) 70%, transparent); }
+.react-flow__selection, .react-flow__nodesselection-rect { background: color-mix(in srgb, var(--af-running) 10%, transparent); border: 1px solid color-mix(in srgb, var(--af-running) 60%, transparent); }
+.react-flow__handle { width: 9px; height: 9px; background: var(--af-card); border: 2px solid var(--af-ring); }
+.react-flow__handle:hover { border-color: var(--af-running); }
+
+/* ── Node shell ────────────────────────────────────────────── */
+.af-node {
+  position: relative; width: 100%; height: 100%;
+  display: grid; grid-template-columns: 40px 1fr; gap: 10px; align-items: start;
+  padding: 10px 12px; border-radius: 12px; background: var(--af-card); color: var(--af-card-fg);
+  border: 1.5px solid var(--af-border); box-shadow: 0 1px 2px rgba(0,0,0,.06);
+  transition: border-color .25s ease, box-shadow .25s ease, opacity .25s ease, transform .15s ease;
+}
+.af-node::before { /* status rail */
+  content: ''; position: absolute; left: -1.5px; top: 10px; bottom: 10px; width: 3px; border-radius: 3px; background: var(--st);
+}
+.af-node:hover { box-shadow: 0 4px 14px rgba(0,0,0,.12); }
+.react-flow__node.selected .af-node { border-color: var(--af-running); box-shadow: 0 0 0 3px color-mix(in srgb, var(--af-running) 25%, transparent); }
+.af-node.live[data-status='running'] { border-color: color-mix(in srgb, var(--af-running) 55%, var(--af-border)); }
+.af-node[data-status='failed'] { border-color: color-mix(in srgb, var(--af-failed) 60%, var(--af-border)); }
+.af-node[data-status='blocked'] { border-color: color-mix(in srgb, var(--af-blocked) 60%, var(--af-border)); }
+.af-node.dimmed { opacity: .35; }
+.af-node.highlighted { box-shadow: 0 0 0 3px color-mix(in srgb, var(--af-blocked) 45%, transparent); }
+.af-node-icon {
+  width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center;
+  background: color-mix(in srgb, var(--kind) 14%, transparent); color: var(--kind);
+}
+.af-node-body { min-width: 0; display: grid; gap: 3px; }
+.af-node-title { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 13px; min-width: 0; }
+.af-node-title .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.af-node-sub { font-size: 12px; color: var(--af-muted-fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.af-node-meta { display: flex; gap: 4px; flex-wrap: nowrap; overflow: hidden; }
+.af-node-foot { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--af-muted-fg); }
+.af-node-foot .status { color: var(--st-text, var(--st)); font-weight: 600; }
+.af-node-error { font-size: 11px; color: var(--af-failed-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.af-node-progress { height: 4px; border-radius: 4px; background: var(--af-muted); overflow: hidden; }
+.af-node-progress > i { display: block; height: 100%; background: var(--af-done); transition: width .4s ease; }
+.af-node-toggle {
+  position: absolute; right: -11px; top: 50%; transform: translateY(-50%);
+  height: 20px; min-width: 20px; padding: 0 6px; border-radius: 999px; font-size: 11px;
+  border: 1px solid var(--af-border); background: var(--af-card); color: var(--af-muted-fg); cursor: pointer; z-index: 2;
+}
+.af-node-toggle:hover { color: var(--af-fg); border-color: var(--af-running); }
+.af-node.compact { grid-template-columns: 32px 1fr; padding: 8px 10px; }
+.af-node.compact .af-node-icon { width: 32px; height: 32px; border-radius: 8px; }
+
+/* kinds */
+.af-node[data-kind='lead'] { --kind: #f97316; border-width: 2px; }
+.af-node[data-kind='team'] { --kind: #6366f1; background: color-mix(in srgb, #6366f1 5%, var(--af-card)); border-style: dashed; }
+.af-node[data-kind='agent'] { --kind: #3b82f6; }
+.af-node[data-kind='subagent'] { --kind: #0ea5e9; }
+.af-node[data-kind='task'] { --kind: #64748b; }
+.af-node[data-kind='review'] { --kind: #a855f7; }
+.af-node[data-kind='test'] { --kind: #d946ef; }
+.af-node[data-kind='worktree'] { --kind: #10b981; }
+.af-node[data-kind='blocker'] { --kind: #f59e0b; background: color-mix(in srgb, #f59e0b 7%, var(--af-card)); }
+
+/* ── Edges ─────────────────────────────────────────────────── */
+.af-edge path.base { fill: none; stroke: var(--st); stroke-width: 1.8; transition: stroke .4s ease, stroke-width .3s ease, opacity .3s ease; }
+.af-edge[data-status='ready'] path.base, .af-edge[data-status='idle'] path.base, .af-edge[data-status='unknown'] path.base { stroke: color-mix(in srgb, var(--af-fg) 30%, transparent); }
+.af-edge[data-status='cancelled'] path.base { stroke-dasharray: 5 5; opacity: .6; }
+.af-edge[data-category='message'] path.base { stroke-dasharray: 2 4; }
+.af-edge[data-category='hierarchy'] path.base { stroke-width: 1.5; }
+.af-edge[data-category='worktree'] path.base { stroke-dasharray: 1 3; }
+.af-edge.active path.base { stroke-width: 2.4; }
+.react-flow__edge.selected .af-edge path.base { stroke-width: 3; }
+.af-edge .glow { fill: none; stroke: var(--st); stroke-width: 6; opacity: .15; }
+.af-edge .particle { fill: var(--st); }
+.af-edge-label {
+  position: absolute; pointer-events: none; font-size: 10px; padding: 1px 5px; border-radius: 4px;
+  background: var(--af-card); border: 1px solid var(--af-border); color: var(--af-muted-fg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .af-edge .particle { display: none; }
+  .af-dot.pulse { animation: none; }
+  .af-node { transition: none; }
+}
+
+/* ── Project boxes ─────────────────────────────────────────── */
+.react-flow__node-project { padding: 0; border: 0; background: transparent; }
+.af-project {
+  --pc: #6366f1;
+  width: 100%; height: 100%; border-radius: 16px;
+  border: 1.5px solid color-mix(in srgb, var(--pc) 45%, var(--af-border));
+  background: color-mix(in srgb, var(--pc) 5%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pc) 8%, transparent);
+}
+.react-flow__node-project.selected .af-project { border-color: var(--pc); box-shadow: 0 0 0 3px color-mix(in srgb, var(--pc) 22%, transparent); }
+.af-project.collapsed { background: var(--af-card); }
+.af-project-head {
+  display: flex; align-items: center; gap: 10px; height: 52px; padding: 0 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--pc) 25%, var(--af-border));
+  background: color-mix(in srgb, var(--pc) 10%, var(--af-card)); border-radius: 15px 15px 0 0;
+}
+.af-project.collapsed .af-project-head { border-bottom: 0; border-radius: 15px; height: 100%; }
+.af-project-icon { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: color-mix(in srgb, var(--pc) 22%, transparent); color: var(--pc); flex: none; }
+.af-project-titles { min-width: 0; flex: 1; }
+.af-project-title { font-weight: 700; font-size: 14px; display: flex; gap: 6px; align-items: center; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.af-project-path { font-size: 11px; color: var(--af-muted-fg); font-family: var(--af-mono); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.af-project-meta { display: flex; align-items: center; gap: 8px; flex: none; }
+.af-project-logos { display: inline-flex; gap: 3px; }
+.af-project-count { display: inline-flex; gap: 5px; align-items: center; font-size: 12px; color: var(--af-muted-fg); white-space: nowrap; }
+.af-project-resize { border-color: var(--pc) !important; }
+.af-project-handle { width: 9px !important; height: 9px !important; background: var(--pc) !important; border: 2px solid var(--af-card) !important; border-radius: 3px; }
+
+/* Full-width detail rows (model · effort, branch, account) instead of squeezed chips. */
+.af-node-details { display: grid; gap: 2px; margin-top: 2px; }
+.af-node-detail { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--af-muted-fg); min-width: 0; }
+.af-node-detail svg { flex: none; opacity: .8; }
+.af-node-detail span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.af-node-detail:first-child { color: var(--af-fg); font-weight: 500; }
+.af-node-detail.mono span { font-family: var(--af-mono); font-size: 11px; }
+.af-node { grid-template-columns: 36px 1fr; gap: 10px; }
+.af-node-title .t { font-size: 13px; }
+
+/* Keyboard focus on a card (Tab or arrow keys) */
+.react-flow__node:focus { outline: none; }
+.react-flow__node:focus-visible .af-node,
+.af-canvas[data-kbd] .react-flow__node:focus .af-node { outline: 2px solid color-mix(in srgb, var(--af-fg) 75%, transparent); outline-offset: 4px; }

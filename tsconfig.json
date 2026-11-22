@@ -1,0 +1,13 @@
+{
+  "extends": "./.orca/types/tsconfig.json",
+  "compilerOptions": {
+    "jsxImportSource": "react",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["node", "orca", "orca-host", "orca-frame", "orca-worker", "orca-services"],
+    "typeRoots": ["./.orca/types", "./node_modules/@types"],
+    "skipLibCheck": true,
+    "noUnusedLocals": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["src/**/*", "test/**/*", "build.mjs"]
+}

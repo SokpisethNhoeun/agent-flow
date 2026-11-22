@@ -1,0 +1,196 @@
+{
+  "$schema": "https://raw.githubusercontent.com/stablyai/orca/main/docs/schemas/plugins/orca-plugin.v2.schema.json",
+  "manifestVersion": 2,
+  "id": "agent-flow",
+  "name": "Agent Flow",
+  "version": "0.1.0",
+  "description": "Live n8n-style canvas of your agents, subagents, orchestration tasks, handoffs and worktrees, with controls.",
+  "author": {
+    "name": "Nhoeun Sokpiseth",
+    "url": "https://github.com/SokpisethNhoeun"
+  },
+  "repository": "https://github.com/SokpisethNhoeun/orca-plugin-agent-flow",
+  "homepage": "https://github.com/SokpisethNhoeun/orca-plugin-agent-flow",
+  "license": "MIT",
+  "icon": "assets/icon.png",
+  "cover": {
+    "path": "assets/cover.webp",
+    "alt": "Agent Flow canvas with a run summary, project box and live agents (test data)"
+  },
+  "screenshots": [
+    {
+      "path": "assets/screenshots/chat.webp",
+      "alt": "An agent's conversation in the inspector, styled like Orca's chat, next to the live canvas (test data)"
+    },
+    {
+      "path": "assets/screenshots/batch-actions.webp",
+      "alt": "Several cards selected with a batch bar and a retry confirmation (test data)"
+    },
+    {
+      "path": "assets/screenshots/compare-runs.webp",
+      "alt": "Two saved runs compared task by task (test data)"
+    }
+  ],
+  "engines": {
+    "orca": ">=1.4.259"
+  },
+  "execution": "trusted-worker",
+  "pluginApi": 1,
+  "main": "dist/worker.mjs",
+  "contributes": {
+    "panels": [
+      {
+        "id": "flow",
+        "title": "Agent Flow",
+        "icon": "blocks",
+        "entry": "dist/ui/panel.html"
+      }
+    ],
+    "customEditors": [
+      {
+        "id": "canvas",
+        "title": "Agent Flow",
+        "extensions": [
+          ".agentflow"
+        ],
+        "entry": "dist/ui/canvas.html",
+        "frame": "isolated"
+      }
+    ],
+    "newFiles": [
+      {
+        "id": "canvas",
+        "title": "New Agent Flow canvas",
+        "extension": ".agentflow",
+        "template": "templates/canvas.agentflow"
+      }
+    ],
+    "commands": [
+      {
+        "id": "agent-flow.showPanel",
+        "title": "Agent Flow: Show panel"
+      },
+      {
+        "id": "agent-flow.dashboardLink",
+        "title": "Agent Flow: Show browser dashboard link"
+      }
+    ],
+    "statusBarItems": [
+      {
+        "id": "agent-flow-status",
+        "text": "Agent Flow",
+        "icon": "blocks",
+        "tooltip": "Live agents seen by Agent Flow",
+        "command": "agent-flow.showPanel"
+      }
+    ],
+    "events": [
+      {
+        "on": "agent.status.changed"
+      },
+      {
+        "on": "workspace.created"
+      },
+      {
+        "on": "workspace.removed"
+      },
+      {
+        "on": "workspace.changed"
+      }
+    ],
+    "hooks": [
+      {
+        "event": "agent.tool.before",
+        "onError": "pass"
+      },
+      {
+        "event": "agent.tool.after"
+      },
+      {
+        "event": "agent.launch.before",
+        "onError": "pass"
+      }
+    ],
+    "settings": [
+      {
+        "key": "dashboardEnabled",
+        "title": "Browser dashboard",
+        "description": "Serve the same live canvas on 127.0.0.1 so you can open it in a browser tab. Only this computer can reach it, and it needs a secret token.",
+        "type": "boolean",
+        "default": false
+      },
+      {
+        "key": "dashboardPort",
+        "title": "Dashboard port",
+        "description": "First port to try on 127.0.0.1. The next free one is used if it is busy.",
+        "type": "integer",
+        "default": 4790,
+        "minimum": 1024,
+        "maximum": 65000
+      },
+      {
+        "key": "dashboardControls",
+        "title": "Allow controls from the browser dashboard",
+        "description": "Off by default: the browser dashboard is view-only until you turn this on.",
+        "type": "boolean",
+        "default": false
+      },
+      {
+        "key": "actAsCoordinator",
+        "title": "Act as the Run coordinator",
+        "description": "Orca only lets a Run's coordinator create, retry or dispatch tasks. When on, Agent Flow runs those actions with the coordinator's handle after you confirm. When off, it shows the exact command to run in the coordinator.",
+        "type": "boolean",
+        "default": false
+      },
+      {
+        "key": "cliPath",
+        "title": "Orca CLI path",
+        "description": "Leave empty to find it automatically. Note: on many Linux systems /usr/bin/orca is the GNOME screen reader, which Agent Flow never runs.",
+        "type": "string",
+        "default": ""
+      },
+      {
+        "key": "chatSend",
+        "title": "Send prompts into chat sessions (experimental)",
+        "description": "Orca's plugin API cannot message chat sessions yet, so Agent Flow uses Orca's own local runtime connection (the one the orca CLI and Orca's mobile app use) for this one action. It may stop working after an Orca update; it then says so instead of sending. Turn off to disable.",
+        "type": "boolean",
+        "default": true
+      }
+    ]
+  },
+  "capabilities": [
+    {
+      "kind": "workspace:read"
+    },
+    {
+      "kind": "workspace:write"
+    },
+    {
+      "kind": "workspace:create"
+    },
+    {
+      "kind": "agent:read"
+    },
+    {
+      "kind": "agent:launch"
+    },
+    {
+      "kind": "terminal:read"
+    },
+    {
+      "kind": "terminal:send"
+    },
+    {
+      "kind": "history:read"
+    },
+    {
+      "kind": "storage:own"
+    },
+    {
+      "kind": "secrets:own"
+    },
+    {
+      "kind": "settings:own"
+    }
+  ]
+}
